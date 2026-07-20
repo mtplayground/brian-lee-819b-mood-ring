@@ -22,7 +22,27 @@ export function storeRoomIdentity(roomId: string, participant: ParticipantIdenti
 export function loadRoomIdentity(roomId: string): StoredRoomIdentity | null {
   try {
     const rawValue = window.localStorage.getItem(identityStorageKey(roomId));
-    return rawValue ? (JSON.parse(rawValue) as StoredRoomIdentity) : null;
+    if (!rawValue) {
+      return null;
+    }
+
+    const value = JSON.parse(rawValue) as Partial<StoredRoomIdentity>;
+
+    if (
+      value.roomId !== roomId ||
+      typeof value.participantId !== "string" ||
+      typeof value.identityKey !== "string" ||
+      (value.slot !== "first" && value.slot !== "second")
+    ) {
+      return null;
+    }
+
+    return {
+      roomId: value.roomId,
+      participantId: value.participantId,
+      identityKey: value.identityKey,
+      slot: value.slot,
+    };
   } catch {
     return null;
   }

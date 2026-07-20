@@ -15,6 +15,14 @@ export type CreateRoomResponse = {
   creatorParticipant: ParticipantIdentity;
 };
 
+export type JoinRoomResponse = {
+  roomId: string;
+  shareableIdentifier: string;
+  sharePath: string;
+  participant: ParticipantIdentity;
+  restoredIdentity: boolean;
+};
+
 type ApiErrorPayload = {
   error?: string;
 };
@@ -44,6 +52,28 @@ export async function createRoom(config: ClientConfig): Promise<CreateRoomRespon
   }
 
   return response.json() as Promise<CreateRoomResponse>;
+}
+
+export async function joinRoom(
+  config: ClientConfig,
+  roomId: string,
+  identityKey?: string,
+): Promise<JoinRoomResponse> {
+  const response = await fetch(`${config.backendBaseUrl}/api/rooms/${encodeURIComponent(roomId)}/join`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ identityKey }),
+  });
+
+  if (!response.ok) {
+    throw await createApiRequestError(response, "Unable to join room");
+  }
+
+  return response.json() as Promise<JoinRoomResponse>;
 }
 
 async function createApiRequestError(response: Response, fallbackMessage: string): Promise<ApiRequestError> {
