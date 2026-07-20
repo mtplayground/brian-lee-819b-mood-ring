@@ -4,6 +4,12 @@ export type {
   MoodPresetId,
   MoodValue,
 } from "./mood";
+export type {
+  MoodSignature,
+  PresetMoodDefinition,
+  SignatureMotion,
+  SignatureTexture,
+} from "./presetMood";
 
 export {
   MAX_MOOD_NOTE_LENGTH,
@@ -14,3 +20,9 @@ export {
   createMoodValue,
   isMoodValue,
 } from "./mood";
+export {
+  PRESET_MOOD_IDS,
+  PRESET_MOODS,
+  getPresetMood,
+  isPresetMoodId,
+} from "./presetMood";
