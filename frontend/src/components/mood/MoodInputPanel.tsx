@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { MoodPresetId, PresetMoodDefinition } from "../../types";
 import { getPresetMood, PRESET_MOODS } from "../../types";
 import { IntensityBlendControl } from "./IntensityBlendControl";
+import { NoteInput } from "./NoteInput";
 import { PresetSelector } from "./PresetSelector";
 
 const DEFAULT_BLEND_VALUE = 50;
@@ -22,6 +23,7 @@ const getAdjacentPreset = (
 export function MoodInputPanel() {
   const [selectedPresetId, setSelectedPresetId] = useState<MoodPresetId | null>(null);
   const [blendValue, setBlendValue] = useState(DEFAULT_BLEND_VALUE);
+  const [note, setNote] = useState("");
   const selectedPreset = useMemo(
     () => (selectedPresetId ? getPresetMood(selectedPresetId) : undefined),
     [selectedPresetId],
@@ -49,9 +51,11 @@ export function MoodInputPanel() {
         value={blendValue}
       />
 
+      <NoteInput value={note} onChange={setNote} />
+
       <p className="mood-input__selection" role="status">
         {selectedPreset
-          ? `${selectedPreset.label}: ${selectedPreset.shorthand}.`
+          ? `${selectedPreset.label}: ${selectedPreset.shorthand}.${note.trim() ? " Note added." : ""}`
           : "No mood selected yet."}
       </p>
     </section>

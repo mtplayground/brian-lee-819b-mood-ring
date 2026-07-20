@@ -346,6 +346,47 @@ a {
   text-align: right;
 }
 
+.note-input {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.note-input__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: rgba(248, 250, 252, 0.68);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.note-input__count {
+  color: rgba(248, 250, 252, 0.52);
+  white-space: nowrap;
+}
+
+.note-input textarea {
+  width: 100%;
+  min-height: 5.25rem;
+  resize: vertical;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #f8fafc;
+  outline: none;
+}
+
+.note-input textarea::placeholder {
+  color: rgba(248, 250, 252, 0.42);
+}
+
+.note-input textarea:focus {
+  border-color: #5eead4;
+}
+
 .preset-selector {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
