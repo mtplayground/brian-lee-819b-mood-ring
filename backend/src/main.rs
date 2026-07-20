@@ -2,6 +2,7 @@ mod config;
 mod db;
 mod routes;
 mod server;
+mod services;
 mod state;
 
 use config::AppConfig;
