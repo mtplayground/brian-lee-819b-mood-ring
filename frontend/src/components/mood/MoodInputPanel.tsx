@@ -1,6 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { MoodPresetId, PresetMoodDefinition } from "../../types";
 import { getPresetMood, PRESET_MOODS } from "../../types";
+import { buildClientMoodState } from "../../state/clientMood";
+import { useAppState } from "../../state/AppStateContext";
 import { IntensityBlendControl } from "./IntensityBlendControl";
 import { NoteInput } from "./NoteInput";
 import { PresetSelector } from "./PresetSelector";
@@ -21,6 +23,7 @@ const getAdjacentPreset = (
 };
 
 export function MoodInputPanel() {
+  const { setCurrentMood } = useAppState();
   const [selectedPresetId, setSelectedPresetId] = useState<MoodPresetId | null>(null);
   const [blendValue, setBlendValue] = useState(DEFAULT_BLEND_VALUE);
   const [note, setNote] = useState("");
@@ -29,11 +32,32 @@ export function MoodInputPanel() {
     [selectedPresetId],
   );
   const adjacentPreset = useMemo(() => getAdjacentPreset(selectedPreset), [selectedPreset]);
+  const assembledMood = useMemo(
+    () =>
+      buildClientMoodState({
+        adjacentPreset,
+        blendDialValue: blendValue,
+        note,
+        selectedPreset,
+      }),
+    [adjacentPreset, blendValue, note, selectedPreset],
+  );
 
   const handleSelectPreset = (preset: PresetMoodDefinition) => {
     setSelectedPresetId(preset.id);
     setBlendValue(DEFAULT_BLEND_VALUE);
   };
+
+  useEffect(() => {
+    setCurrentMood(assembledMood);
+  }, [assembledMood, setCurrentMood]);
+
+  useEffect(
+    () => () => {
+      setCurrentMood(null);
+    },
+    [setCurrentMood],
+  );
 
   return (
     <section className="mood-input" aria-labelledby="mood-input-heading">
@@ -55,7 +79,7 @@ export function MoodInputPanel() {
 
       <p className="mood-input__selection" role="status">
         {selectedPreset
-          ? `${selectedPreset.label}: ${selectedPreset.shorthand}.${note.trim() ? " Note added." : ""}`
+          ? `${selectedPreset.label}: ${selectedPreset.shorthand}. ${Math.round((assembledMood?.value.intensity ?? 0) * 100)}% intensity.${assembledMood?.blend ? ` Blending ${Math.round(assembledMood.blend.amount * 100)}%.` : ""}${note.trim() ? " Note added." : ""}`
           : "No mood selected yet."}
       </p>
     </section>
