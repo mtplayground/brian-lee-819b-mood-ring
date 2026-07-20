@@ -1,0 +1,78 @@
+use axum::{routing::get, Router};
+use http::{HeaderValue, Method};
+use tower_http::{
+    cors::{Any, CorsLayer},
+    services::{ServeDir, ServeFile},
+    trace::TraceLayer,
+};
+use tracing::warn;
+
+use crate::{config::AppConfig, routes::health::health_check};
+
+pub fn build_router(config: AppConfig) -> Router {
+    let static_service = ServeDir::new(&config.frontend_dist_dir)
+        .not_found_service(ServeFile::new(config.frontend_dist_dir.join("index.html")));
+
+    Router::new()
+        .route("/health", get(health_check))
+        .fallback_service(static_service)
+        .layer(cors_layer(&config))
+        .layer(TraceLayer::new_for_http())
+}
+
+fn cors_layer(config: &AppConfig) -> CorsLayer {
+    let layer = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::PATCH, Method::DELETE])
+        .allow_headers(Any);
+
+    match config.allowed_cors_origin.as_deref() {
+        Some(origin) => match HeaderValue::from_str(origin) {
+            Ok(origin) => layer.allow_origin(origin),
+            Err(error) => {
+                warn!(%origin, %error, "ignoring invalid ALLOWED_CORS_ORIGIN");
+                layer
+            }
+        },
+        None => layer,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{
+        body::{to_bytes, Body},
+        http::{Request, StatusCode},
+    };
+    use tower::ServiceExt;
+
+    fn test_config() -> AppConfig {
+        AppConfig {
+            host: "127.0.0.1".to_owned(),
+            port: 8080,
+            database_url: "postgres://example".to_owned(),
+            allowed_cors_origin: Some("http://localhost:8080".to_owned()),
+            frontend_dist_dir: "../frontend/dist".into(),
+        }
+    }
+
+    #[tokio::test]
+    async fn health_route_is_mounted() {
+        let response = build_router(test_config())
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("health body");
+        let payload: serde_json::Value = serde_json::from_slice(&body).expect("json body");
+        assert_eq!(payload["status"], "ok");
+    }
+}
