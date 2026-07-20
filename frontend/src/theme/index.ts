@@ -12,3 +12,4 @@ export type {
   ThemeRenderResult,
 } from "./renderer";
 export { baseThemeRenderer } from "./renderer";
+export { organicThemeRenderer } from "./organicRenderer";

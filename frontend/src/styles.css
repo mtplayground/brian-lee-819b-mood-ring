@@ -74,6 +74,19 @@ a {
     color var(--theme-motion-duration) var(--theme-easing);
 }
 
+.theme-renderer--organic {
+  --organic-canopy-opacity: 0.28;
+  --organic-current-opacity: 0.26;
+  --organic-flow-duration: 1800ms;
+  --organic-light-opacity: 0.32;
+  --organic-sway-distance: 14px;
+  --organic-sway-lift: -6px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--theme-bg-start) 88%, #0f2f24) 0%, transparent 46%),
+    radial-gradient(ellipse at 50% 112%, color-mix(in srgb, var(--theme-stage-core) 42%, transparent) 0%, transparent 54%),
+    linear-gradient(145deg, var(--theme-bg-start) 0%, var(--theme-bg-mid) 54%, var(--theme-bg-end) 100%);
+}
+
 .app-header {
   position: relative;
   z-index: 2;
@@ -595,6 +608,82 @@ a {
   transition: background var(--theme-motion-duration) var(--theme-easing);
 }
 
+.theme-renderer--organic .theme-stage {
+  height: 40vh;
+}
+
+.theme-renderer--organic .theme-stage__surface {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, transparent 0%, var(--theme-stage-glow) 32%, var(--theme-stage-core) 100%),
+    repeating-linear-gradient(104deg, transparent 0 38px, color-mix(in srgb, var(--theme-stage-accent) 32%, transparent) 39px 41px, transparent 42px 82px),
+    linear-gradient(90deg, var(--theme-stage-core), var(--theme-stage-accent), var(--theme-stage-glow));
+}
+
+.theme-renderer--organic .theme-stage__surface::before,
+.theme-renderer--organic .theme-stage__surface::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+.theme-renderer--organic .theme-stage__surface::before {
+  inset: 18% -12% -8%;
+  background:
+    repeating-radial-gradient(ellipse at 50% 100%, transparent 0 30px, color-mix(in srgb, var(--theme-accent) 42%, transparent) 31px 33px, transparent 34px 64px),
+    repeating-linear-gradient(178deg, transparent 0 54px, color-mix(in srgb, var(--theme-stage-core) 34%, transparent) 55px 58px, transparent 59px 118px);
+  opacity: var(--organic-current-opacity);
+  transform: translateY(var(--organic-sway-distance));
+  animation: organic-current var(--organic-flow-duration) var(--theme-easing) infinite alternate;
+}
+
+.theme-renderer--organic .theme-stage__surface::after {
+  inset: -10% -6% 0;
+  background:
+    linear-gradient(115deg, transparent 0 26%, color-mix(in srgb, var(--theme-accent) 44%, transparent) 28%, transparent 32% 100%),
+    repeating-linear-gradient(68deg, transparent 0 44px, color-mix(in srgb, var(--theme-stage-glow) 52%, transparent) 45px 47px, transparent 48px 98px),
+    repeating-linear-gradient(112deg, transparent 0 74px, color-mix(in srgb, var(--theme-core) 36%, transparent) 75px 78px, transparent 79px 142px);
+  opacity: var(--organic-canopy-opacity);
+  transform-origin: bottom center;
+  animation: organic-sway var(--organic-flow-duration) var(--theme-easing) infinite alternate;
+}
+
+.theme-renderer--organic .route-panel {
+  border-color: color-mix(in srgb, var(--theme-accent) 32%, rgba(255, 255, 255, var(--theme-border-strength)));
+  box-shadow:
+    0 var(--theme-panel-shadow-y) 80px rgba(0, 0, 0, 0.26),
+    0 0 40px color-mix(in srgb, var(--theme-stage-core) 24%, transparent);
+}
+
+.theme-renderer--organic .app-header__symbol {
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--theme-core) 74%, #ffffff), var(--theme-accent));
+  box-shadow:
+    0 0 var(--theme-glow-size) var(--theme-stage-core),
+    inset 0 0 0 0.22rem color-mix(in srgb, var(--theme-bg-start) 72%, transparent);
+}
+
+@keyframes organic-current {
+  from {
+    transform: translate3d(-2%, var(--organic-sway-distance), 0);
+  }
+
+  to {
+    transform: translate3d(3%, 0, 0);
+  }
+}
+
+@keyframes organic-sway {
+  from {
+    transform: translate3d(-1%, 0, 0) skewX(-1deg);
+  }
+
+  to {
+    transform: translate3d(1%, var(--organic-sway-lift), 0) skewX(1deg);
+  }
+}
+
 @media (max-width: 720px) {
   .app-header {
     align-items: flex-start;
@@ -631,5 +720,12 @@ a {
   .blend-control__dial {
     grid-row: auto;
     justify-self: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-renderer--organic .theme-stage__surface::before,
+  .theme-renderer--organic .theme-stage__surface::after {
+    animation: none;
   }
 }

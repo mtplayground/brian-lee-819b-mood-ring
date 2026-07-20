@@ -43,7 +43,7 @@ export type ThemeRenderer = {
   render: (tokens: ThemeTokens, mood: ClientMoodState | null) => ThemeRenderResult;
 };
 
-const tokensToCssVariables = (tokens: ThemeTokens): ThemeCssVariables => ({
+export const tokensToCssVariables = (tokens: ThemeTokens): ThemeCssVariables => ({
   "--theme-accent": tokens.palette.accent,
   "--theme-bg-end": tokens.palette.backgroundEnd,
   "--theme-bg-mid": tokens.palette.backgroundMid,
