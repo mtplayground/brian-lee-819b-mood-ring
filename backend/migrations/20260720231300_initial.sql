@@ -1,0 +1,1 @@
+-- Establishes the SQLx migration ledger for later schema changes.
