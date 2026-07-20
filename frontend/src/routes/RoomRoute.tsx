@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiRequestError, joinRoom, type JoinRoomResponse } from "../api/rooms";
+import { MoodInputPanel } from "../components/mood/MoodInputPanel";
 import { useAppState } from "../state/AppStateContext";
 import {
   loadRoomIdentity,
@@ -146,6 +147,8 @@ export function RoomRoute() {
           Create another room
         </Link>
       </div>
+
+      {isJoined && <MoodInputPanel />}
     </section>
   );
 }

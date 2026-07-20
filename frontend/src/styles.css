@@ -204,6 +204,99 @@ a {
   font-weight: 700;
 }
 
+.mood-input {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.mood-input__header {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.mood-input h2 {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(1.35rem, 4vw, 2rem);
+  line-height: 1.1;
+}
+
+.mood-input__selection {
+  min-height: 1.35rem;
+  margin: 0;
+  color: #bae6fd;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.preset-selector {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.preset-selector__option {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: center;
+  min-height: 5.75rem;
+  padding: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--preset-ambient) 54%, transparent), rgba(255, 255, 255, 0.06)),
+    rgba(15, 23, 42, 0.64);
+  color: #f8fafc;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.preset-selector__option:hover {
+  border-color: color-mix(in srgb, var(--preset-core) 72%, #ffffff);
+  transform: translateY(-1px);
+}
+
+.preset-selector__option[aria-selected="true"] {
+  border-color: var(--preset-core);
+  box-shadow: 0 0 0 1px var(--preset-core), 0 16px 40px rgba(0, 0, 0, 0.24);
+}
+
+.preset-selector__swatch {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 30%, var(--preset-accent), transparent 36%),
+    linear-gradient(135deg, var(--preset-core), var(--preset-ambient));
+}
+
+.preset-selector__copy {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.preset-selector__label {
+  color: #ffffff;
+  font-size: 0.98rem;
+  font-weight: 850;
+}
+
+.preset-selector__shorthand {
+  color: rgba(248, 250, 252, 0.68);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
 .share-link {
   display: grid;
   gap: 1rem;
@@ -323,5 +416,9 @@ a {
   .config-list div {
     grid-template-columns: 1fr;
     gap: 0.25rem;
+  }
+
+  .preset-selector {
+    grid-template-columns: 1fr;
   }
 }
