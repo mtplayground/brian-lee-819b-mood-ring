@@ -1,4 +1,7 @@
-use axum::{routing::get, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 use http::{HeaderValue, Method};
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -7,7 +10,11 @@ use tower_http::{
 };
 use tracing::warn;
 
-use crate::{config::AppConfig, routes::health::health_check, state::AppState};
+use crate::{
+    config::AppConfig,
+    routes::{health::health_check, rooms::create_room},
+    state::AppState,
+};
 
 pub fn build_router(config: AppConfig, state: AppState) -> Router {
     let static_service = ServeDir::new(&config.frontend_dist_dir)
@@ -15,6 +22,7 @@ pub fn build_router(config: AppConfig, state: AppState) -> Router {
 
     Router::new()
         .route("/health", get(health_check))
+        .route("/api/rooms", post(create_room))
         .fallback_service(static_service)
         .with_state(state)
         .layer(cors_layer(&config))
@@ -80,5 +88,24 @@ mod tests {
         let payload: serde_json::Value = serde_json::from_slice(&body).expect("json body");
         assert_eq!(payload["status"], "ok");
         assert_eq!(payload["database"], "ready");
+    }
+
+    #[tokio::test]
+    async fn create_room_route_is_mounted_under_api_prefix() {
+        let state = AppState::new(
+            sqlx::PgPool::connect_lazy("postgres://example").expect("lazy pool"),
+        );
+        let response = build_router(test_config(), state)
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/rooms")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_ne!(response.status(), StatusCode::NOT_FOUND);
     }
 }
