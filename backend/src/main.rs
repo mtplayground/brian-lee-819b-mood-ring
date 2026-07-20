@@ -1,8 +1,11 @@
 mod config;
+mod db;
 mod routes;
 mod server;
+mod state;
 
 use config::AppConfig;
+use state::AppState;
 use tokio::net::TcpListener;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -24,13 +27,20 @@ async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!(
         %addr,
         database_url = config.redacted_database_url(),
+        database_max_connections = config.database_max_connections,
         allowed_cors_origin = config.allowed_cors_origin.as_deref().unwrap_or("not configured"),
         frontend_dist_dir = %config.frontend_dist_dir.display(),
         "starting backend"
     );
 
+    let pool = db::connect(&config).await?;
+    db::run_migrations(&pool).await?;
+    db::check_connectivity(&pool).await?;
+    info!("database connection pool is ready");
+
+    let app_state = AppState::new(pool);
     let listener = TcpListener::bind(addr).await?;
-    axum::serve(listener, server::build_router(config))
+    axum::serve(listener, server::build_router(config, app_state))
         .with_graceful_shutdown(shutdown_signal())
         .await?;
 

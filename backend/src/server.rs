@@ -7,15 +7,16 @@ use tower_http::{
 };
 use tracing::warn;
 
-use crate::{config::AppConfig, routes::health::health_check};
+use crate::{config::AppConfig, routes::health::health_check, state::AppState};
 
-pub fn build_router(config: AppConfig) -> Router {
+pub fn build_router(config: AppConfig, state: AppState) -> Router {
     let static_service = ServeDir::new(&config.frontend_dist_dir)
         .not_found_service(ServeFile::new(config.frontend_dist_dir.join("index.html")));
 
     Router::new()
         .route("/health", get(health_check))
         .fallback_service(static_service)
+        .with_state(state)
         .layer(cors_layer(&config))
         .layer(TraceLayer::new_for_http())
 }
@@ -51,6 +52,7 @@ mod tests {
             host: "127.0.0.1".to_owned(),
             port: 8080,
             database_url: "postgres://example".to_owned(),
+            database_max_connections: 5,
             allowed_cors_origin: Some("http://localhost:8080".to_owned()),
             frontend_dist_dir: "../frontend/dist".into(),
         }
@@ -58,7 +60,10 @@ mod tests {
 
     #[tokio::test]
     async fn health_route_is_mounted() {
-        let response = build_router(test_config())
+        let state = AppState::new(
+            sqlx::PgPool::connect_lazy("postgres://example").expect("lazy pool"),
+        );
+        let response = build_router(test_config(), state)
             .oneshot(
                 Request::builder()
                     .uri("/health")
@@ -74,5 +79,6 @@ mod tests {
             .expect("health body");
         let payload: serde_json::Value = serde_json::from_slice(&body).expect("json body");
         assert_eq!(payload["status"], "ok");
+        assert_eq!(payload["database"], "ready");
     }
 }
