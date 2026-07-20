@@ -12,7 +12,10 @@ use tracing::warn;
 
 use crate::{
     config::AppConfig,
-    routes::{health::health_check, rooms::create_room},
+    routes::{
+        health::health_check,
+        rooms::{create_room, join_room},
+    },
     state::AppState,
 };
 
@@ -23,6 +26,7 @@ pub fn build_router(config: AppConfig, state: AppState) -> Router {
     Router::new()
         .route("/health", get(health_check))
         .route("/api/rooms", post(create_room))
+        .route("/api/rooms/{room_id}/join", post(join_room))
         .fallback_service(static_service)
         .with_state(state)
         .layer(cors_layer(&config))
@@ -101,6 +105,26 @@ mod tests {
                     .method("POST")
                     .uri("/api/rooms")
                     .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_ne!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn join_room_route_is_mounted_under_api_prefix() {
+        let state = AppState::new(
+            sqlx::PgPool::connect_lazy("postgres://example").expect("lazy pool"),
+        );
+        let response = build_router(test_config(), state)
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/rooms/00000000-0000-4000-8000-000000000000/join")
+                    .header("content-type", "application/json")
+                    .body(Body::from("{}"))
                     .expect("request"),
             )
             .await
