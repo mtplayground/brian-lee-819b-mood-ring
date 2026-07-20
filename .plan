@@ -1,0 +1,50 @@
+Architecture plan for the 32-issue implementation sequence
+
+Product shape
+- Single-page React + Vite frontend served separately during development and eventually by the Rust backend/static deployment path.
+- Rust/Axum backend owns HTTP APIs, WebSocket room channels, PostgreSQL persistence, configuration, and static asset hosting for deployment.
+- PostgreSQL stores durable room, participant, and latest mood snapshot state. Live mood blending flows through WebSockets and is periodically persisted as snapshots.
+
+Repository and module structure
+- frontend/
+  - package.json, vite.config.ts, tsconfig files, index.html
+  - src/main.tsx and src/App.tsx
+  - src/api/ for typed REST and WebSocket clients
+  - src/types/ for shared frontend mood, room, participant, theme, and snapshot types
+  - src/components/room/ for create, join, share link, presence, and connection status UI
+  - src/components/mood/ for preset selector, intensity/blend dial, note field, and local mood composer
+  - src/themes/ for theme engine, renderer interface, and concrete renderers
+  - src/state/ for room session, participant identity, theme preference, and live mood state
+  - src/test/ for frontend tests and Playwright helpers
+- backend/
+  - Cargo.toml, src/main.rs, src/config.rs, src/error.rs, src/state.rs
+  - src/routes/health.rs, rooms.rs, snapshots.rs, ws.rs
+  - src/domain/ for mood, room, participant, snapshot, and protocol models
+  - src/db/ for pool setup, migration integration, and repository methods
+  - migrations/ for SQL migrations
+  - tests/ for integration tests against HTTP/WebSocket behavior
+- shared contracts
+  - Prefer one canonical mood model in backend Rust domain code and mirrored TypeScript types in frontend/src/types.
+  - Keep API payloads versionable and serde-friendly: explicit enums, stable field names, optional note field, and no frontend-only presentation fields in persistence models.
+
+Issue dependency map
+- Foundation: #1 frontend scaffold, #2 backend scaffold, #3 database/migrations, #4 shared mood representation.
+- Data/API base: #5 room and participant schema depends on #3/#4; #6 create-room depends on #5; #7 join-room depends on #5/#6.
+- Room entry UI: #8 create/share UI depends on #1/#6; #9 join UI depends on #1/#7.
+- Mood input: #10 curated presets depends on #4; #11 preset selector depends on #10; #12 dial and #13 note field depend on #11; #14 live client mood state depends on #11-#13.
+- Rendering themes: #15 theme engine depends on #4/#14; #16-#19 concrete themes depend on #15; #20 selector depends on #16-#19; #21 persistence of preference depends on #20.
+- Realtime: #22 WebSocket room channel depends on #2/#5/#7; #23 mood broadcast depends on #14/#22; #24 presence depends on #7/#22; #25 client reconnect depends on #22/#23/#24.
+- Shared experience: #26 canvas live blending depends on #15-#20 and #23/#25.
+- Snapshot persistence: #27 latest snapshot persistence depends on #3/#5/#23/#26; #28 read endpoint depends on #27.
+- Product polish and validation: #29 postcard/solo/live modes depends on #20/#26/#28; #30 E2E core loop depends on #6/#7/#22/#23/#26; #31 error/status review depends on all user-visible API and WebSocket flows; #32 deployment preparation depends on completed frontend/backend integration.
+
+Key design decisions
+- Use Axum with tokio, tower-http tracing/cors/static-file layers, sqlx for PostgreSQL and migrations, serde for API contracts, uuid for room/participant IDs, and chrono or time for timestamps.
+- Derive public URLs and allowed origins from forwarded headers or ALLOWED_CORS_ORIGIN so deployment behind the Ideavibes proxy works without rejecting the app's own Vite/static assets.
+- Treat participant identity as a browser-local stable token scoped to a room. The backend validates room membership and maps WebSocket connections to participant records.
+- Model mood as composable structured data: preset id, color/energy/valence-like dimensions, intensity, blend amount, optional note, participant id, and updated timestamp. Keep presets curated and deterministic.
+- WebSockets carry typed protocol messages: join acknowledgement, mood update, mood broadcast, presence update, snapshot update, error, and heartbeat/ping if needed.
+- The frontend owns immediate local interaction state and optimistic rendering; the backend owns room authority, presence membership, broadcasts, and latest persisted snapshot.
+- Theme renderers implement a small interface that receives the blended live mood, participant contributions, and transition progress. Concrete themes remain isolated so each theme issue can be implemented without rewriting shared state.
+- Persist only the latest snapshot per room initially, not the entire mood event stream, to keep issue #27 focused and deployment simple.
+- Keep tests focused by layer: Rust integration tests for health/API/DB/WebSocket contracts, frontend component tests for controls, and Playwright for the final create/join/update core loop.
