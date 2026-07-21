@@ -239,6 +239,40 @@ pub async fn update_participant_theme_preference(
     }
 }
 
+pub async fn authenticate_room_participant(
+    pool: &PgPool,
+    room_id: RoomId,
+    participant_id: ParticipantId,
+    identity_key: ParticipantIdentityKey,
+) -> Result<Participant, RoomServiceError> {
+    let row: Option<ParticipantRow> = sqlx::query_as(
+        r#"
+        SELECT
+            id,
+            room_id,
+            slot,
+            identity_key,
+            latest_mood,
+            latest_mood_updated_at,
+            last_used_theme_id,
+            created_at,
+            updated_at
+        FROM participants
+        WHERE room_id = $1 AND id = $2 AND identity_key = $3
+        "#,
+    )
+    .bind(room_id.value())
+    .bind(participant_id.value())
+    .bind(identity_key.as_str())
+    .fetch_optional(pool)
+    .await?;
+
+    match row {
+        Some(row) => participant_from_row(row),
+        None => Err(RoomServiceError::ParticipantNotFound),
+    }
+}
+
 pub fn generate_identity_key() -> String {
     Uuid::new_v4().simple().to_string()
 }
