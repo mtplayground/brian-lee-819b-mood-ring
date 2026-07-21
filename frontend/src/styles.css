@@ -87,6 +87,20 @@ a {
     linear-gradient(145deg, var(--theme-bg-start) 0%, var(--theme-bg-mid) 54%, var(--theme-bg-end) 100%);
 }
 
+.theme-renderer--geometric {
+  --geometric-block-size: 112px;
+  --geometric-field-offset: 20px;
+  --geometric-field-offset-negative: -20px;
+  --geometric-gap: 28px;
+  --geometric-grid-opacity: 0.24;
+  --geometric-sweep-duration: 1400ms;
+  --geometric-type-weight: 840;
+  --geometric-word-spacing: 0.05em;
+  background:
+    linear-gradient(90deg, var(--theme-bg-start) 0 24%, transparent 24% 100%),
+    linear-gradient(135deg, var(--theme-bg-mid) 0 48%, var(--theme-core) 48% 64%, var(--theme-bg-end) 64% 100%);
+}
+
 .app-header {
   position: relative;
   z-index: 2;
@@ -612,6 +626,84 @@ a {
   height: 40vh;
 }
 
+.theme-renderer--geometric .app-header__mark,
+.theme-renderer--geometric .route-panel h1,
+.theme-renderer--geometric .mood-input h2,
+.theme-renderer--geometric .share-link h2 {
+  font-weight: var(--geometric-type-weight);
+  letter-spacing: 0;
+  word-spacing: var(--geometric-word-spacing);
+}
+
+.theme-renderer--geometric .app-header__symbol {
+  border-radius: 2px;
+  background: var(--theme-accent);
+  box-shadow: var(--geometric-field-offset) var(--geometric-field-offset) 0 var(--theme-core);
+  transform: rotate(45deg);
+}
+
+.theme-renderer--geometric .route-panel {
+  border-color: var(--theme-accent);
+  border-radius: 4px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--theme-core) 16%, transparent) 0 2px, transparent 2px 100%),
+    linear-gradient(180deg, color-mix(in srgb, var(--theme-accent) 14%, transparent) 0 2px, transparent 2px 100%),
+    var(--theme-surface);
+  background-size:
+    var(--geometric-gap) var(--geometric-gap),
+    var(--geometric-gap) var(--geometric-gap),
+    auto;
+  box-shadow:
+    var(--geometric-field-offset) var(--geometric-field-offset) 0 color-mix(in srgb, var(--theme-core) 34%, transparent),
+    0 var(--theme-panel-shadow-y) 60px rgba(0, 0, 0, 0.3);
+}
+
+.theme-renderer--geometric .button,
+.theme-renderer--geometric .preset-selector__option,
+.theme-renderer--geometric .note-input textarea,
+.theme-renderer--geometric .share-link__field input {
+  border-radius: 4px;
+}
+
+.theme-renderer--geometric .theme-stage {
+  height: 38vh;
+}
+
+.theme-renderer--geometric .theme-stage__surface {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, var(--theme-stage-core) 0 34%, transparent 34% 100%),
+    linear-gradient(90deg, transparent 0 48%, var(--theme-stage-accent) 48% 68%, transparent 68% 100%),
+    linear-gradient(90deg, transparent 0 72%, var(--theme-stage-glow) 72% 100%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, var(--geometric-grid-opacity)) 0 1px, transparent 1px var(--geometric-block-size));
+}
+
+.theme-renderer--geometric .theme-stage__surface::before,
+.theme-renderer--geometric .theme-stage__surface::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+.theme-renderer--geometric .theme-stage__surface::before {
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent 0 16%, color-mix(in srgb, var(--theme-accent) 64%, transparent) 16% 26%, transparent 26% 100%),
+    linear-gradient(0deg, transparent 0 42%, color-mix(in srgb, var(--theme-core) 48%, transparent) 42% 54%, transparent 54% 100%);
+  transform: translateX(var(--geometric-field-offset-negative));
+  animation: geometric-sweep var(--geometric-sweep-duration) var(--theme-easing) infinite alternate;
+}
+
+.theme-renderer--geometric .theme-stage__surface::after {
+  inset: 18% 8% 8%;
+  border: 1px solid color-mix(in srgb, var(--theme-text) 42%, transparent);
+  background:
+    linear-gradient(90deg, transparent 0 50%, color-mix(in srgb, var(--theme-bg-start) 58%, transparent) 50% 100%),
+    repeating-linear-gradient(0deg, transparent 0 calc(var(--geometric-gap) - 1px), color-mix(in srgb, var(--theme-text) 24%, transparent) calc(var(--geometric-gap) - 1px) var(--geometric-gap));
+  opacity: 0.82;
+}
+
 .theme-renderer--organic .theme-stage__surface {
   position: relative;
   overflow: hidden;
@@ -684,6 +776,16 @@ a {
   }
 }
 
+@keyframes geometric-sweep {
+  from {
+    transform: translate3d(var(--geometric-field-offset-negative), 0, 0);
+  }
+
+  to {
+    transform: translate3d(var(--geometric-field-offset), 0, 0);
+  }
+}
+
 @media (max-width: 720px) {
   .app-header {
     align-items: flex-start;
@@ -725,7 +827,8 @@ a {
 
 @media (prefers-reduced-motion: reduce) {
   .theme-renderer--organic .theme-stage__surface::before,
-  .theme-renderer--organic .theme-stage__surface::after {
+  .theme-renderer--organic .theme-stage__surface::after,
+  .theme-renderer--geometric .theme-stage__surface::before {
     animation: none;
   }
 }
