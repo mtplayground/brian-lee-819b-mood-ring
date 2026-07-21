@@ -12,7 +12,12 @@ export type MoodSocketPayload =
       type: "moodClear";
     };
 
-export type RoomSocketEvent =
+export type PresenceParticipant = {
+  participantId: string;
+  slot: ParticipantSlot;
+};
+
+type ParticipantLifecycleEvent =
   | {
       type: "participantConnected";
       participantId: string;
@@ -22,13 +27,24 @@ export type RoomSocketEvent =
       type: "participantDisconnected";
       participantId: string;
       slot: ParticipantSlot;
-    }
-  | {
-      type: "participantMessage";
-      participantId: string;
-      slot: ParticipantSlot;
-      payload: unknown;
     };
+
+type ParticipantMessageEvent = {
+  type: "participantMessage";
+  participantId: string;
+  slot: ParticipantSlot;
+  payload: unknown;
+};
+
+type PresenceSnapshotEvent = {
+  type: "presenceSnapshot";
+  participants: PresenceParticipant[];
+};
+
+export type RoomSocketEvent =
+  | ParticipantLifecycleEvent
+  | ParticipantMessageEvent
+  | PresenceSnapshotEvent;
 
 type ParticipantEventShell = {
   participantId: string;
@@ -77,6 +93,17 @@ export function parseRoomSocketEvent(rawValue: string): RoomSocketEvent | null {
         : null;
     }
 
+    if (eventType === "presenceSnapshot" && Array.isArray(value.participants)) {
+      const participants = value.participants.filter(isPresenceParticipant);
+
+      return participants.length === value.participants.length
+        ? {
+            type: eventType,
+            participants,
+          }
+        : null;
+    }
+
     return null;
   } catch {
     return null;
@@ -118,10 +145,23 @@ export function moodClearMessage(): string {
 }
 
 function isParticipantEvent(
-  value: Partial<RoomSocketEvent>,
+  value: Partial<ParticipantLifecycleEvent | ParticipantMessageEvent>,
 ): value is ParticipantEventShell {
   return (
     typeof value.participantId === "string" &&
     (value.slot === "first" || value.slot === "second")
+  );
+}
+
+function isPresenceParticipant(value: unknown): value is PresenceParticipant {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<PresenceParticipant>;
+
+  return (
+    typeof candidate.participantId === "string" &&
+    (candidate.slot === "first" || candidate.slot === "second")
   );
 }

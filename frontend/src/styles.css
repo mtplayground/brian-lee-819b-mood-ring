@@ -401,6 +401,7 @@ a {
   font-weight: 700;
 }
 
+.presence-panel,
 .remote-mood {
   display: grid;
   gap: 0.45rem;
@@ -414,6 +415,7 @@ a {
     border-color var(--theme-motion-duration) var(--theme-easing);
 }
 
+.presence-panel h2,
 .remote-mood h2 {
   margin: 0;
   color: #ffffff;
@@ -421,6 +423,7 @@ a {
   line-height: 1.15;
 }
 
+.presence-panel p:not(.route-panel__eyebrow),
 .remote-mood p:not(.route-panel__eyebrow) {
   margin: 0;
   color: var(--theme-muted-text);
