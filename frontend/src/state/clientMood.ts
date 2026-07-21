@@ -1,5 +1,5 @@
 import type { MoodValue, PresetMoodDefinition } from "../types";
-import { createMoodValue, isMoodValue } from "../types";
+import { createMoodValue, getPresetMood, isMoodValue } from "../types";
 
 export type MoodBlendState = {
   adjacentPresetId: MoodValue["presetId"];
@@ -68,6 +68,26 @@ export function buildClientMoodState({
         : null,
     blendDialValue: normalizedDialValue,
     updatedAt: new Date().toISOString(),
+  };
+}
+
+export function clientMoodStateFromMoodValue(
+  value: MoodValue,
+  updatedAt: string,
+): ClientMoodState | null {
+  const selectedPreset = getPresetMood(value.presetId);
+
+  if (!selectedPreset) {
+    return null;
+  }
+
+  return {
+    value,
+    selectedPreset,
+    adjacentPreset: undefined,
+    blend: null,
+    blendDialValue: Math.round(value.intensity * 50),
+    updatedAt,
   };
 }
 
