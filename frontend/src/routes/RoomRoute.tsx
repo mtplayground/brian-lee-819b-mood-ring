@@ -13,6 +13,7 @@ import {
   storeRoomIdentity,
   type StoredRoomIdentity,
 } from "../state/roomIdentity";
+import { useRoomMoodSocket } from "../state/useRoomMoodSocket";
 
 type JoinStatus = "idle" | "joining" | "joined";
 
@@ -31,7 +32,7 @@ const errorMessageFor = (error: unknown): string => {
 };
 
 export function RoomRoute() {
-  const { config, setActiveRoomIdentity, setActiveThemeId } = useAppState();
+  const { config, remoteMood, setActiveRoomIdentity, setActiveThemeId } = useAppState();
   const { roomId } = useParams();
   const [identity, setIdentity] = useState<StoredRoomIdentity | null>(() =>
     roomId ? loadRoomIdentity(roomId) : null,
@@ -103,6 +104,19 @@ export function RoomRoute() {
 
   const isJoined = status === "joined" && identity;
   const isReturning = Boolean(joinResult?.restoredIdentity);
+  useRoomMoodSocket(isJoined ? identity : null);
+
+  const remoteMoodSummary = remoteMood
+    ? [
+        `${Math.round(remoteMood.mood.value.intensity * 100)}% intensity`,
+        remoteMood.mood.blend
+          ? `${Math.round(remoteMood.mood.blend.amount * 100)}% blended`
+          : null,
+        remoteMood.mood.value.note || null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : null;
 
   return (
     <section className="route-panel room-entry" aria-labelledby="room-heading">
@@ -167,7 +181,26 @@ export function RoomRoute() {
         </Link>
       </div>
 
-      {isJoined && <MoodInputPanel />}
+      {isJoined && (
+        <>
+          <MoodInputPanel />
+
+          <section className="remote-mood" aria-labelledby="remote-mood-heading">
+            <p className="route-panel__eyebrow">Other person</p>
+            {remoteMood ? (
+              <>
+                <h2 id="remote-mood-heading">{remoteMood.mood.selectedPreset.label}</h2>
+                <p>{remoteMoodSummary}</p>
+              </>
+            ) : (
+              <>
+                <h2 id="remote-mood-heading">Waiting for their mood</h2>
+                <p>Their live mood will appear here as soon as they choose one.</p>
+              </>
+            )}
+          </section>
+        </>
+      )}
     </section>
   );
 }
