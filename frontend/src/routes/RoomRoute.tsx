@@ -2,13 +2,19 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ApiRequestError,
+  getLatestSnapshot,
   getThemePreference,
   joinRoom,
   type JoinRoomResponse,
 } from "../api/rooms";
 import { MoodInputPanel } from "../components/mood/MoodInputPanel";
+import { PostcardMoodView } from "../components/mood/PostcardMoodView";
 import { SharedMoodCanvas } from "../components/mood/SharedMoodCanvas";
 import { useAppState } from "../state/AppStateContext";
+import {
+  clientMoodStateFromMoodValue,
+  type ClientMoodState,
+} from "../state/clientMood";
 import {
   loadRoomIdentity,
   storeRoomIdentity,
@@ -17,6 +23,7 @@ import {
 import { useRoomMoodSocket } from "../state/useRoomMoodSocket";
 
 type JoinStatus = "idle" | "joining" | "joined";
+type SnapshotStatus = "idle" | "loading" | "ready" | "error";
 
 const errorMessageFor = (error: unknown): string => {
   if (error instanceof ApiRequestError) {
@@ -47,6 +54,9 @@ export function RoomRoute() {
     roomId ? loadRoomIdentity(roomId) : null,
   );
   const [joinResult, setJoinResult] = useState<JoinRoomResponse | null>(null);
+  const [postcardMood, setPostcardMood] = useState<ClientMoodState | null>(null);
+  const [postcardParticipantId, setPostcardParticipantId] = useState<string | null>(null);
+  const [snapshotStatus, setSnapshotStatus] = useState<SnapshotStatus>("idle");
   const [status, setStatus] = useState<JoinStatus>(identity ? "joining" : "idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -91,6 +101,9 @@ export function RoomRoute() {
       setIdentity(null);
       setActiveRoomIdentity(null);
       setJoinResult(null);
+      setPostcardMood(null);
+      setPostcardParticipantId(null);
+      setSnapshotStatus("idle");
       setStatus("idle");
       return;
     }
@@ -99,6 +112,9 @@ export function RoomRoute() {
     setIdentity(storedIdentity);
     setActiveRoomIdentity(null);
     setJoinResult(null);
+    setPostcardMood(null);
+    setPostcardParticipantId(null);
+    setSnapshotStatus("idle");
     setErrorMessage(null);
 
     if (storedIdentity) {
@@ -119,6 +135,11 @@ export function RoomRoute() {
     ? roomPresence.filter((participant) => participant.participantId !== identity.participantId)
     : [];
   const isSocketReady = socketConnection.status === "connected";
+  const isLiveTogether = isSocketReady && otherParticipants.length > 0;
+  const isPostcardMode = isSocketReady && !isLiveTogether;
+  const displayedPostcardMood = postcardMood ?? remoteMood?.mood ?? null;
+  const displayedPostcardUpdatedAt =
+    postcardMood?.updatedAt ?? remoteMood?.mood.updatedAt ?? null;
   const connectionMode = isSocketReady
     ? otherParticipants.length > 0
       ? "Live together"
@@ -129,10 +150,60 @@ export function RoomRoute() {
   const connectionMessage = isSocketReady
     ? otherParticipants.length > 0
       ? "The other person is here now. Mood changes are live."
-      : "You are connected. The other person will see updates when they return."
+      : snapshotStatus === "loading"
+        ? "You are connected. Loading the other person's last saved mood."
+        : displayedPostcardMood
+          ? "You are connected. The other person's saved mood is shown as a postcard."
+          : "You are connected. The other person will see updates when they return."
     : socketConnection.status === "reconnecting"
       ? `Connection dropped. Reconnecting attempt ${socketConnection.reconnectAttempt}.`
       : "Opening the live room connection.";
+
+  useEffect(() => {
+    if (!isJoined || !identity || !isPostcardMode) {
+      if (isLiveTogether) {
+        setPostcardMood(null);
+        setPostcardParticipantId(null);
+        setSnapshotStatus("idle");
+      }
+
+      return;
+    }
+
+    let isCancelled = false;
+    setSnapshotStatus("loading");
+
+    void getLatestSnapshot(config, identity.roomId, identity)
+      .then((response) => {
+        if (isCancelled) {
+          return;
+        }
+
+        setPostcardParticipantId(response.participantId);
+
+        if (!response.snapshot) {
+          setPostcardMood(null);
+          setSnapshotStatus("ready");
+          return;
+        }
+
+        setPostcardMood(
+          clientMoodStateFromMoodValue(response.snapshot.mood, response.snapshot.updatedAt),
+        );
+        setSnapshotStatus("ready");
+      })
+      .catch(() => {
+        if (isCancelled) {
+          return;
+        }
+
+        setSnapshotStatus("error");
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [config, identity, isJoined, isLiveTogether, isPostcardMode]);
 
   const remoteMoodSummary = remoteMood
     ? [
@@ -217,11 +288,19 @@ export function RoomRoute() {
             <p>{connectionMessage}</p>
           </section>
 
-          <SharedMoodCanvas
-            activeThemeId={activeThemeId}
-            localMood={currentMood}
-            remoteMood={remoteMood?.mood ?? null}
-          />
+          {isPostcardMode ? (
+            <PostcardMoodView
+              activeThemeId={activeThemeId}
+              mood={displayedPostcardMood}
+              snapshotUpdatedAt={displayedPostcardUpdatedAt}
+            />
+          ) : (
+            <SharedMoodCanvas
+              activeThemeId={activeThemeId}
+              localMood={currentMood}
+              remoteMood={remoteMood?.mood ?? null}
+            />
+          )}
 
           <MoodInputPanel />
 
@@ -229,8 +308,24 @@ export function RoomRoute() {
             <p className="route-panel__eyebrow">Other person</p>
             {remoteMood ? (
               <>
-                <h2 id="remote-mood-heading">{remoteMood.mood.selectedPreset.label}</h2>
+                <h2 id="remote-mood-heading">
+                  {isLiveTogether ? remoteMood.mood.selectedPreset.label : "Saved postcard"}
+                </h2>
                 <p>{remoteMoodSummary}</p>
+              </>
+            ) : displayedPostcardMood ? (
+              <>
+                <h2 id="remote-mood-heading">{displayedPostcardMood.selectedPreset.label}</h2>
+                <p>
+                  {postcardParticipantId
+                    ? "This is their most recent saved mood."
+                    : "This saved mood is available while they are away."}
+                </p>
+              </>
+            ) : snapshotStatus === "error" ? (
+              <>
+                <h2 id="remote-mood-heading">Postcard unavailable</h2>
+                <p>The saved mood could not be loaded. Live mood will appear when they return.</p>
               </>
             ) : (
               <>
