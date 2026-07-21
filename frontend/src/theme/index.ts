@@ -14,3 +14,4 @@ export type {
 export { baseThemeRenderer } from "./renderer";
 export { geometricThemeRenderer } from "./geometricRenderer";
 export { organicThemeRenderer } from "./organicRenderer";
+export { painterlyThemeRenderer } from "./painterlyRenderer";
