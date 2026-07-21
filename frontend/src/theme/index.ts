@@ -44,3 +44,6 @@ export const themeRendererById: Record<CreativeThemeId, ThemeRenderer> = {
   painterly: painterlyThemeRenderer,
   retro: retroThemeRenderer,
 };
+
+export const isCreativeThemeId = (value: string): value is CreativeThemeId =>
+  creativeThemeChoices.some((choice) => choice.id === value);

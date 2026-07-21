@@ -25,11 +25,19 @@ pub struct JoinedRoom {
     pub restored_identity: bool,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct ParticipantThemePreference {
+    pub participant_id: ParticipantId,
+    pub theme_id: ThemeId,
+    pub updated_at: OffsetDateTime,
+}
+
 #[derive(Debug)]
 pub enum RoomServiceError {
     Database(sqlx::Error),
     InvalidParticipant(ParticipantModelError),
     RoomNotFound,
+    ParticipantNotFound,
     RoomFull,
 }
 
@@ -43,6 +51,7 @@ impl fmt::Display for RoomServiceError {
                 write!(formatter, "invalid participant data while creating room: {error}")
             }
             Self::RoomNotFound => write!(formatter, "room was not found"),
+            Self::ParticipantNotFound => write!(formatter, "participant was not found"),
             Self::RoomFull => write!(formatter, "room already has two participants"),
         }
     }
@@ -53,7 +62,7 @@ impl Error for RoomServiceError {
         match self {
             Self::Database(error) => Some(error),
             Self::InvalidParticipant(error) => Some(error),
-            Self::RoomNotFound | Self::RoomFull => None,
+            Self::RoomNotFound | Self::ParticipantNotFound | Self::RoomFull => None,
         }
     }
 }
@@ -167,6 +176,67 @@ pub async fn join_room(
         participant,
         restored_identity: false,
     })
+}
+
+pub async fn get_participant_theme_preference(
+    pool: &PgPool,
+    room_id: RoomId,
+    participant_id: ParticipantId,
+    identity_key: ParticipantIdentityKey,
+) -> Result<ParticipantThemePreference, RoomServiceError> {
+    let row: Option<(Uuid, String, OffsetDateTime)> = sqlx::query_as(
+        r#"
+        SELECT id, last_used_theme_id, updated_at
+        FROM participants
+        WHERE room_id = $1 AND id = $2 AND identity_key = $3
+        "#,
+    )
+    .bind(room_id.value())
+    .bind(participant_id.value())
+    .bind(identity_key.as_str())
+    .fetch_optional(pool)
+    .await?;
+
+    match row {
+        Some((participant_id, theme_id, updated_at)) => Ok(ParticipantThemePreference {
+            participant_id: ParticipantId::new(participant_id),
+            theme_id: ThemeId::new(theme_id)?,
+            updated_at,
+        }),
+        None => Err(RoomServiceError::ParticipantNotFound),
+    }
+}
+
+pub async fn update_participant_theme_preference(
+    pool: &PgPool,
+    room_id: RoomId,
+    participant_id: ParticipantId,
+    identity_key: ParticipantIdentityKey,
+    theme_id: ThemeId,
+) -> Result<ParticipantThemePreference, RoomServiceError> {
+    let row: Option<(Uuid, String, OffsetDateTime)> = sqlx::query_as(
+        r#"
+        UPDATE participants
+        SET last_used_theme_id = $4, updated_at = NOW()
+        WHERE room_id = $1 AND id = $2 AND identity_key = $3
+        RETURNING id, last_used_theme_id, updated_at
+        "#,
+    )
+    .bind(room_id.value())
+    .bind(participant_id.value())
+    .bind(identity_key.as_str())
+    .bind(theme_id.as_str())
+    .fetch_optional(pool)
+    .await?;
+
+    match row {
+        Some((participant_id, theme_id, updated_at)) => Ok(ParticipantThemePreference {
+            participant_id: ParticipantId::new(participant_id),
+            theme_id: ThemeId::new(theme_id)?,
+            updated_at,
+        }),
+        None => Err(RoomServiceError::ParticipantNotFound),
+    }
 }
 
 pub fn generate_identity_key() -> String {
@@ -366,5 +436,13 @@ mod tests {
     #[test]
     fn room_full_error_is_distinct() {
         assert_eq!(RoomServiceError::RoomFull.to_string(), "room already has two participants");
+    }
+
+    #[test]
+    fn participant_not_found_error_is_distinct() {
+        assert_eq!(
+            RoomServiceError::ParticipantNotFound.to_string(),
+            "participant was not found"
+        );
     }
 }

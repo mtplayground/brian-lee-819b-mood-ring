@@ -2,13 +2,16 @@ import { createContext, useContext, useMemo, useState, type PropsWithChildren } 
 import type { ClientConfig } from "../api/config";
 import type { CreativeThemeId } from "../theme";
 import type { ClientMoodState } from "./clientMood";
+import type { StoredRoomIdentity } from "./roomIdentity";
 
 export type AppThemeMode = "system" | "light" | "dark";
 
 export type AppState = {
   activeThemeId: CreativeThemeId;
+  activeRoomIdentity: StoredRoomIdentity | null;
   config: ClientConfig;
   currentMood: ClientMoodState | null;
+  setActiveRoomIdentity: (identity: StoredRoomIdentity | null) => void;
   setActiveThemeId: (themeId: CreativeThemeId) => void;
   setCurrentMood: (currentMood: ClientMoodState | null) => void;
   themeMode: AppThemeMode;
@@ -22,6 +25,7 @@ type AppStateProviderProps = PropsWithChildren<{
 }>;
 
 export function AppStateProvider({ children, config }: AppStateProviderProps) {
+  const [activeRoomIdentity, setActiveRoomIdentity] = useState<StoredRoomIdentity | null>(null);
   const [activeThemeId, setActiveThemeId] = useState<CreativeThemeId>("retro");
   const [currentMood, setCurrentMood] = useState<ClientMoodState | null>(null);
   const [themeMode, setThemeMode] = useState<AppThemeMode>("system");
@@ -29,14 +33,16 @@ export function AppStateProvider({ children, config }: AppStateProviderProps) {
   const value = useMemo<AppState>(
     () => ({
       activeThemeId,
+      activeRoomIdentity,
       config,
       currentMood,
+      setActiveRoomIdentity,
       setActiveThemeId,
       setCurrentMood,
       themeMode,
       setThemeMode,
     }),
-    [activeThemeId, config, currentMood, themeMode],
+    [activeRoomIdentity, activeThemeId, config, currentMood, themeMode],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
