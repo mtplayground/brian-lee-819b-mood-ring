@@ -25,7 +25,7 @@ use crate::{
 
 pub fn build_router(config: AppConfig, state: AppState) -> Router {
     let static_service = ServeDir::new(&config.frontend_dist_dir)
-        .not_found_service(ServeFile::new(config.frontend_dist_dir.join("index.html")));
+        .fallback(ServeFile::new(config.frontend_dist_dir.join("index.html")));
 
     Router::new()
         .route("/health", get(health_check))
@@ -209,5 +209,39 @@ mod tests {
             .expect("response");
 
         assert_ne!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn frontend_fallback_serves_client_routes_with_ok_status() {
+        let dist_dir = std::env::temp_dir().join(format!(
+            "mood-ring-dist-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&dist_dir).expect("create test dist dir");
+        std::fs::write(dist_dir.join("index.html"), "<main>app shell</main>")
+            .expect("write index");
+
+        let mut config = test_config();
+        config.frontend_dist_dir = dist_dir.clone();
+        let state = AppState::new(
+            sqlx::PgPool::connect_lazy("postgres://example").expect("lazy pool"),
+        );
+        let response = build_router(config, state)
+            .oneshot(
+                Request::builder()
+                    .uri("/rooms/self-hosted-route")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("frontend body");
+        assert_eq!(&body[..], b"<main>app shell</main>");
+
+        std::fs::remove_dir_all(dist_dir).expect("clean test dist dir");
     }
 }

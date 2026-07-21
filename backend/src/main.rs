@@ -26,6 +26,7 @@ async fn main() {
 
 async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let config = AppConfig::from_env()?;
+    config.validate_frontend_build()?;
     let addr = config.socket_addr()?;
 
     info!(

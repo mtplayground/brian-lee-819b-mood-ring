@@ -13,6 +13,7 @@ pub struct AppConfig {
 #[derive(Debug, PartialEq, Eq)]
 pub enum ConfigError {
     MissingRequiredEnv { key: &'static str },
+    MissingFrontendBuild { index_html: PathBuf },
     InvalidPort { value: String },
     InvalidDatabaseMaxConnections { value: String },
 }
@@ -23,6 +24,11 @@ impl fmt::Display for ConfigError {
             Self::MissingRequiredEnv { key } => {
                 write!(formatter, "missing required environment variable {key}")
             }
+            Self::MissingFrontendBuild { index_html } => write!(
+                formatter,
+                "frontend build is missing at {}; run `npm --prefix frontend run build` or set FRONTEND_DIST_DIR",
+                index_html.display()
+            ),
             Self::InvalidPort { value } => {
                 write!(formatter, "PORT must be a valid TCP port, got {value:?}")
             }
@@ -60,6 +66,16 @@ impl AppConfig {
 
     pub fn socket_addr(&self) -> Result<SocketAddr, std::net::AddrParseError> {
         format!("{}:{}", self.host, self.port).parse()
+    }
+
+    pub fn validate_frontend_build(&self) -> Result<(), ConfigError> {
+        let index_html = self.frontend_dist_dir.join("index.html");
+
+        if index_html.is_file() {
+            Ok(())
+        } else {
+            Err(ConfigError::MissingFrontendBuild { index_html })
+        }
     }
 
     pub fn redacted_database_url(&self) -> &'static str {
@@ -135,6 +151,25 @@ mod tests {
             parse_database_max_connections(Some("0".to_owned())),
             Err(ConfigError::InvalidDatabaseMaxConnections {
                 value: "0".to_owned()
+            })
+        );
+    }
+
+    #[test]
+    fn validate_frontend_build_requires_index_html() {
+        let config = AppConfig {
+            host: "127.0.0.1".to_owned(),
+            port: 8080,
+            database_url: "postgres://example".to_owned(),
+            database_max_connections: 5,
+            allowed_cors_origin: None,
+            frontend_dist_dir: PathBuf::from("definitely-missing-dist"),
+        };
+
+        assert_eq!(
+            config.validate_frontend_build(),
+            Err(ConfigError::MissingFrontendBuild {
+                index_html: PathBuf::from("definitely-missing-dist/index.html")
             })
         );
     }
