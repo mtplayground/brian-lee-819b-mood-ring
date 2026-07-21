@@ -101,6 +101,21 @@ a {
     linear-gradient(135deg, var(--theme-bg-mid) 0 48%, var(--theme-core) 48% 64%, var(--theme-bg-end) 64% 100%);
 }
 
+.theme-renderer--painterly {
+  --painterly-blur: 24px;
+  --painterly-drift-duration: 1800ms;
+  --painterly-drift-x: 18px;
+  --painterly-drift-x-negative: -18px;
+  --painterly-saturation: 1.14;
+  --painterly-stroke-opacity: 0.42;
+  --painterly-wash-opacity: 0.56;
+  background:
+    linear-gradient(118deg, color-mix(in srgb, var(--theme-bg-start) 82%, #ffffff) 0%, transparent 38%),
+    linear-gradient(34deg, transparent 0 28%, color-mix(in srgb, var(--theme-core) 48%, transparent) 44%, transparent 66%),
+    linear-gradient(152deg, var(--theme-bg-start) 0%, var(--theme-bg-mid) 48%, var(--theme-bg-end) 100%);
+  filter: saturate(var(--painterly-saturation));
+}
+
 .app-header {
   position: relative;
   z-index: 2;
@@ -669,6 +684,76 @@ a {
   height: 38vh;
 }
 
+.theme-renderer--painterly .app-header__symbol {
+  border-color: color-mix(in srgb, var(--theme-accent) 64%, #ffffff);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--theme-core) 62%, transparent), color-mix(in srgb, var(--theme-accent) 74%, transparent));
+  box-shadow:
+    0 0 var(--theme-glow-size) color-mix(in srgb, var(--theme-stage-glow) 72%, transparent),
+    inset 0 0 12px color-mix(in srgb, var(--theme-text) 18%, transparent);
+}
+
+.theme-renderer--painterly .route-panel {
+  border-color: color-mix(in srgb, var(--theme-accent) 22%, rgba(255, 255, 255, var(--theme-border-strength)));
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--theme-surface) 88%, transparent), color-mix(in srgb, var(--theme-stage-core) 16%, var(--theme-surface))),
+    var(--theme-surface);
+  box-shadow:
+    0 var(--theme-panel-shadow-y) 90px rgba(0, 0, 0, 0.24),
+    0 0 64px color-mix(in srgb, var(--theme-stage-glow) 28%, transparent);
+  backdrop-filter: blur(24px) saturate(1.15);
+}
+
+.theme-renderer--painterly .button--primary {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--theme-accent) 88%, #ffffff), color-mix(in srgb, var(--theme-core) 82%, var(--theme-accent)));
+}
+
+.theme-renderer--painterly .theme-stage {
+  height: 42vh;
+}
+
+.theme-renderer--painterly .theme-stage__surface {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(115deg, color-mix(in srgb, var(--theme-stage-core) 76%, transparent) 0 18%, transparent 38% 100%),
+    linear-gradient(38deg, transparent 0 22%, color-mix(in srgb, var(--theme-stage-accent) 74%, transparent) 36%, transparent 62% 100%),
+    linear-gradient(154deg, transparent 0 40%, color-mix(in srgb, var(--theme-stage-glow) 86%, transparent) 62%, transparent 82%),
+    repeating-linear-gradient(168deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 18px);
+}
+
+.theme-renderer--painterly .theme-stage__surface::before,
+.theme-renderer--painterly .theme-stage__surface::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+  filter: blur(var(--painterly-blur));
+  transform-origin: center;
+}
+
+.theme-renderer--painterly .theme-stage__surface::before {
+  inset: 12% -8% 18%;
+  border-radius: 46% 54% 44% 56%;
+  background:
+    linear-gradient(100deg, transparent 0 10%, var(--theme-stage-core) 24%, var(--theme-stage-accent) 48%, transparent 72% 100%),
+    linear-gradient(166deg, transparent 0 18%, color-mix(in srgb, var(--theme-accent) 74%, transparent) 42%, transparent 70%);
+  opacity: var(--painterly-wash-opacity);
+  transform: translate3d(var(--painterly-drift-x-negative), 0, 0) rotate(-3deg);
+  animation: painterly-drift var(--painterly-drift-duration) var(--theme-easing) infinite alternate;
+}
+
+.theme-renderer--painterly .theme-stage__surface::after {
+  inset: 28% 2% -10%;
+  border-radius: 58% 42% 56% 44%;
+  background:
+    linear-gradient(82deg, transparent 0 8%, color-mix(in srgb, var(--theme-core) 82%, transparent) 20%, transparent 42% 100%),
+    linear-gradient(142deg, transparent 0 28%, color-mix(in srgb, var(--theme-stage-glow) 78%, transparent) 48%, var(--theme-stage-accent) 68%, transparent 86%);
+  opacity: var(--painterly-stroke-opacity);
+  transform: translate3d(var(--painterly-drift-x), 0, 0) rotate(4deg);
+  animation: painterly-drift-reverse var(--painterly-drift-duration) var(--theme-easing) infinite alternate;
+}
+
 .theme-renderer--geometric .theme-stage__surface {
   position: relative;
   overflow: hidden;
@@ -786,6 +871,26 @@ a {
   }
 }
 
+@keyframes painterly-drift {
+  from {
+    transform: translate3d(var(--painterly-drift-x-negative), 0, 0) rotate(-3deg);
+  }
+
+  to {
+    transform: translate3d(var(--painterly-drift-x), -4px, 0) rotate(2deg);
+  }
+}
+
+@keyframes painterly-drift-reverse {
+  from {
+    transform: translate3d(var(--painterly-drift-x), 0, 0) rotate(4deg);
+  }
+
+  to {
+    transform: translate3d(var(--painterly-drift-x-negative), 5px, 0) rotate(-2deg);
+  }
+}
+
 @media (max-width: 720px) {
   .app-header {
     align-items: flex-start;
@@ -828,7 +933,9 @@ a {
 @media (prefers-reduced-motion: reduce) {
   .theme-renderer--organic .theme-stage__surface::before,
   .theme-renderer--organic .theme-stage__surface::after,
-  .theme-renderer--geometric .theme-stage__surface::before {
+  .theme-renderer--geometric .theme-stage__surface::before,
+  .theme-renderer--painterly .theme-stage__surface::before,
+  .theme-renderer--painterly .theme-stage__surface::after {
     animation: none;
   }
 }
