@@ -74,6 +74,19 @@ a {
     color var(--theme-motion-duration) var(--theme-easing);
 }
 
+.theme-renderer--transitioning::after {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background:
+    linear-gradient(110deg, transparent 0 16%, color-mix(in srgb, var(--theme-accent) 26%, transparent) 42%, transparent 68% 100%),
+    linear-gradient(180deg, color-mix(in srgb, var(--theme-bg-start) 28%, transparent), transparent 58%);
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  animation: theme-lens-shift 560ms var(--theme-easing) 1;
+}
+
 .theme-renderer--organic {
   --organic-canopy-opacity: 0.28;
   --organic-current-opacity: 0.26;
@@ -135,6 +148,7 @@ a {
   position: relative;
   z-index: 2;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
@@ -178,6 +192,92 @@ a {
   color: var(--theme-accent);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.theme-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.theme-selector__options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.28rem;
+  min-width: min(32rem, 46vw);
+  padding: 0.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.36);
+  backdrop-filter: blur(14px);
+}
+
+.theme-selector__option,
+.theme-selector__cycle {
+  min-height: 2.35rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--theme-text);
+  font-size: 0.78rem;
+  font-weight: 800;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.theme-selector__option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  background: transparent;
+}
+
+.theme-selector__option:hover,
+.theme-selector__cycle:hover {
+  transform: translateY(-1px);
+}
+
+.theme-selector__option[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--theme-accent) 62%, #ffffff);
+  background: color-mix(in srgb, var(--theme-core) 28%, rgba(255, 255, 255, 0.08));
+}
+
+.theme-selector__swatch {
+  flex: 0 0 auto;
+  width: 0.72rem;
+  height: 0.72rem;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 50%;
+}
+
+.theme-selector__swatch--organic {
+  background: linear-gradient(135deg, #34d399, #38bdf8);
+}
+
+.theme-selector__swatch--geometric {
+  border-radius: 2px;
+  background: linear-gradient(135deg, #f43f5e 0 48%, #22d3ee 48% 100%);
+}
+
+.theme-selector__swatch--painterly {
+  background: linear-gradient(135deg, #c084fc, #fb7185, #22d3ee);
+}
+
+.theme-selector__swatch--retro {
+  background: conic-gradient(from 220deg, #f59e0b, #0f766e, #fef3c7, #f59e0b);
+}
+
+.theme-selector__cycle {
+  padding: 0.45rem 0.72rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .app-main {
@@ -652,6 +752,10 @@ a {
   transition: background var(--theme-motion-duration) var(--theme-easing);
 }
 
+.theme-renderer--transitioning .theme-stage {
+  animation: theme-stage-focus 560ms var(--theme-easing) 1;
+}
+
 .theme-renderer--organic .theme-stage {
   height: 40vh;
 }
@@ -1001,6 +1105,34 @@ a {
   }
 }
 
+@keyframes theme-lens-shift {
+  0% {
+    opacity: 0;
+    transform: translateX(-12%);
+  }
+
+  42% {
+    opacity: 0.72;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(12%);
+  }
+}
+
+@keyframes theme-stage-focus {
+  0% {
+    filter: saturate(0.84) blur(2px);
+    transform: scale(0.992);
+  }
+
+  100% {
+    filter: saturate(1) blur(0);
+    transform: scale(1);
+  }
+}
+
 @media (max-width: 720px) {
   .app-header {
     align-items: flex-start;
@@ -1013,6 +1145,21 @@ a {
 
   .app-header__meta code {
     max-width: 100%;
+  }
+
+  .theme-selector,
+  .theme-selector__options {
+    width: 100%;
+  }
+
+  .theme-selector {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .theme-selector__options {
+    min-width: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .config-list div {
@@ -1046,7 +1193,9 @@ a {
   .theme-renderer--geometric .theme-stage__surface::before,
   .theme-renderer--painterly .theme-stage__surface::before,
   .theme-renderer--painterly .theme-stage__surface::after,
-  .theme-renderer--retro .theme-stage__surface::after {
+  .theme-renderer--retro .theme-stage__surface::after,
+  .theme-renderer--transitioning::after,
+  .theme-renderer--transitioning .theme-stage {
     animation: none;
   }
 }
