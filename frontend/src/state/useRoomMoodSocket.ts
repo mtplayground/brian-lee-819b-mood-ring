@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   buildRoomWebSocketUrl,
   moodClearMessage,
@@ -10,10 +10,29 @@ import { useAppState } from "./AppStateContext";
 import type { ClientMoodState } from "./clientMood";
 import type { StoredRoomIdentity } from "./roomIdentity";
 
+const INITIAL_RECONNECT_DELAY_MS = 500;
+const MAX_RECONNECT_DELAY_MS = 5000;
+
+export type RoomSocketConnectionStatus =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "reconnecting";
+
+export type RoomSocketConnectionState = {
+  reconnectAttempt: number;
+  status: RoomSocketConnectionStatus;
+};
+
 export function useRoomMoodSocket(identity: StoredRoomIdentity | null) {
   const { config, currentMood, setRemoteMood, setRoomPresence } = useAppState();
+  const [connectionState, setConnectionState] = useState<RoomSocketConnectionState>({
+    reconnectAttempt: 0,
+    status: "idle",
+  });
   const socketRef = useRef<WebSocket | null>(null);
   const latestMoodRef = useRef<ClientMoodState | null>(currentMood);
+  const reconnectAttemptRef = useRef(0);
 
   useEffect(() => {
     latestMoodRef.current = currentMood;
@@ -23,20 +42,56 @@ export function useRoomMoodSocket(identity: StoredRoomIdentity | null) {
     if (!identity) {
       socketRef.current?.close();
       socketRef.current = null;
+      reconnectAttemptRef.current = 0;
+      setConnectionState({
+        reconnectAttempt: 0,
+        status: "idle",
+      });
       setRemoteMood(null);
       setRoomPresence([]);
       return undefined;
     }
 
-    const socket = new WebSocket(buildRoomWebSocketUrl(config, identity.roomId, identity));
-    socketRef.current = socket;
+    let isDisposed = false;
+    let reconnectTimer: number | null = null;
 
-    socket.onopen = () => {
-      const latestMood = latestMoodRef.current;
-      socket.send(latestMood ? moodUpdateMessage(latestMood) : moodClearMessage());
+    const clearReconnectTimer = () => {
+      if (reconnectTimer === null) {
+        return;
+      }
+
+      window.clearTimeout(reconnectTimer);
+      reconnectTimer = null;
     };
 
-    socket.onmessage = (event) => {
+    const scheduleReconnect = () => {
+      if (isDisposed) {
+        return;
+      }
+
+      const reconnectAttempt = reconnectAttemptRef.current + 1;
+      reconnectAttemptRef.current = reconnectAttempt;
+      const delay = Math.min(
+        MAX_RECONNECT_DELAY_MS,
+        INITIAL_RECONNECT_DELAY_MS * 2 ** (reconnectAttempt - 1),
+      );
+
+      setRoomPresence([]);
+      setConnectionState({
+        reconnectAttempt,
+        status: "reconnecting",
+      });
+      clearReconnectTimer();
+      reconnectTimer = window.setTimeout(() => {
+        openSocket();
+      }, delay);
+    };
+
+    const handleRoomMessage = (event: MessageEvent) => {
+      if (isDisposed) {
+        return;
+      }
+
       if (typeof event.data !== "string") {
         return;
       }
@@ -77,21 +132,60 @@ export function useRoomMoodSocket(identity: StoredRoomIdentity | null) {
       });
     };
 
-    socket.onclose = () => {
-      if (socketRef.current === socket) {
-        socketRef.current = null;
+    const openSocket = () => {
+      if (isDisposed) {
+        return;
       }
+
+      setConnectionState({
+        reconnectAttempt: reconnectAttemptRef.current,
+        status: reconnectAttemptRef.current > 0 ? "reconnecting" : "connecting",
+      });
+
+      const socket = new WebSocket(buildRoomWebSocketUrl(config, identity.roomId, identity));
+      socketRef.current = socket;
+
+      socket.onopen = () => {
+        if (isDisposed) {
+          socket.close();
+          return;
+        }
+
+        reconnectAttemptRef.current = 0;
+        setConnectionState({
+          reconnectAttempt: 0,
+          status: "connected",
+        });
+
+        const latestMood = latestMoodRef.current;
+        socket.send(latestMood ? moodUpdateMessage(latestMood) : moodClearMessage());
+      };
+
+      socket.onmessage = handleRoomMessage;
+
+      socket.onclose = () => {
+        if (isDisposed) {
+          return;
+        }
+
+        if (socketRef.current === socket) {
+          socketRef.current = null;
+        }
+        scheduleReconnect();
+      };
+
+      socket.onerror = () => {
+        socket.close();
+      };
     };
 
-    socket.onerror = () => {
-      socket.close();
-    };
+    openSocket();
 
     return () => {
-      if (socketRef.current === socket) {
-        socketRef.current = null;
-      }
-      socket.close();
+      isDisposed = true;
+      clearReconnectTimer();
+      socketRef.current?.close();
+      socketRef.current = null;
     };
   }, [config, identity, setRemoteMood, setRoomPresence]);
 
@@ -103,4 +197,6 @@ export function useRoomMoodSocket(identity: StoredRoomIdentity | null) {
 
     socket.send(currentMood ? moodUpdateMessage(currentMood) : moodClearMessage());
   }, [currentMood, identity]);
+
+  return connectionState;
 }
