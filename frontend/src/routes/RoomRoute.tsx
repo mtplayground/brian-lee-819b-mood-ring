@@ -27,13 +27,25 @@ type SnapshotStatus = "idle" | "loading" | "ready" | "error";
 
 const errorMessageFor = (error: unknown): string => {
   if (error instanceof ApiRequestError) {
-    if (error.status === 404) {
+    if (error.code === "room_not_found" || error.status === 404) {
       return "This room link does not exist.";
     }
 
-    if (error.status === 409) {
+    if (error.code === "room_full" || error.status === 409) {
       return "This room already has two people.";
     }
+
+    if (error.status === 400) {
+      return "This room link is invalid. Check the link and try again.";
+    }
+
+    if (error.status >= 500) {
+      return "The room service is having trouble. Try again shortly.";
+    }
+  }
+
+  if (error instanceof TypeError) {
+    return "Unable to reach the room service. Check your connection and try again.";
   }
 
   return error instanceof Error ? error.message : "Unable to join room";
@@ -158,6 +170,23 @@ export function RoomRoute() {
     : socketConnection.status === "reconnecting"
       ? `Connection dropped. Reconnecting attempt ${socketConnection.reconnectAttempt}.`
       : "Opening the live room connection.";
+  const connectionStatusClass = isSocketReady
+    ? isLiveTogether
+      ? "connection-status--live"
+      : "connection-status--solo"
+    : socketConnection.status === "reconnecting"
+      ? "connection-status--reconnecting"
+      : "connection-status--connecting";
+  const reconnectDetail =
+    socketConnection.status === "reconnecting" && socketConnection.nextRetryMs !== null
+      ? `Next retry in ${Math.ceil(socketConnection.nextRetryMs / 1000)}s.`
+      : null;
+  const closeDetail =
+    socketConnection.status === "reconnecting" && socketConnection.lastCloseCode !== null
+      ? `Last close code ${socketConnection.lastCloseCode}${
+          socketConnection.lastCloseReason ? `: ${socketConnection.lastCloseReason}` : ""
+        }.`
+      : null;
 
   useEffect(() => {
     if (!isJoined || !identity || !isPostcardMode) {
@@ -284,8 +313,16 @@ export function RoomRoute() {
         <>
           <section className="presence-panel" aria-labelledby="presence-heading">
             <p className="route-panel__eyebrow">Presence</p>
-            <h2 id="presence-heading">{connectionMode}</h2>
+            <div className={`connection-status ${connectionStatusClass}`}>
+              <span className="connection-status__dot" aria-hidden="true" />
+              <h2 id="presence-heading">{connectionMode}</h2>
+            </div>
             <p>{connectionMessage}</p>
+            {(reconnectDetail || closeDetail) && (
+              <p className="connection-status__meta">
+                {[reconnectDetail, closeDetail].filter(Boolean).join(" ")}
+              </p>
+            )}
           </section>
 
           {isPostcardMode ? (

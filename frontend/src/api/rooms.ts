@@ -45,6 +45,7 @@ export type LatestSnapshotResponse = {
 
 type ApiErrorPayload = {
   error?: string;
+  message?: string;
 };
 
 export class ApiRequestError extends Error {
@@ -79,15 +80,18 @@ export async function joinRoom(
   roomId: string,
   identityKey?: string,
 ): Promise<JoinRoomResponse> {
-  const response = await fetch(`${config.backendBaseUrl}/api/rooms/${encodeURIComponent(roomId)}/join`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
+  const response = await fetch(
+    `${config.backendBaseUrl}/api/rooms/${encodeURIComponent(roomId)}/join`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ identityKey }),
     },
-    body: JSON.stringify({ identityKey }),
-  });
+  );
 
   if (!response.ok) {
     throw await createApiRequestError(response, "Unable to join room");
@@ -188,7 +192,11 @@ async function createApiRequestError(response: Response, fallbackMessage: string
     payload = undefined;
   }
 
-  return new ApiRequestError(payload?.error ?? fallbackMessage, response.status, payload?.error);
+  return new ApiRequestError(
+    payload?.message ?? payload?.error ?? fallbackMessage,
+    response.status,
+    payload?.error,
+  );
 }
 
 function parseLatestSnapshotResponse(value: unknown): LatestSnapshotResponse {

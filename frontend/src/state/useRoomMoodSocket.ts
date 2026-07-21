@@ -20,16 +20,26 @@ export type RoomSocketConnectionStatus =
   | "reconnecting";
 
 export type RoomSocketConnectionState = {
+  lastCloseCode: number | null;
+  lastCloseReason: string | null;
+  nextRetryMs: number | null;
   reconnectAttempt: number;
   status: RoomSocketConnectionStatus;
 };
 
+const initialConnectionState = (): RoomSocketConnectionState => ({
+  lastCloseCode: null,
+  lastCloseReason: null,
+  nextRetryMs: null,
+  reconnectAttempt: 0,
+  status: "idle",
+});
+
 export function useRoomMoodSocket(identity: StoredRoomIdentity | null) {
   const { config, currentMood, setRemoteMood, setRoomPresence } = useAppState();
-  const [connectionState, setConnectionState] = useState<RoomSocketConnectionState>({
-    reconnectAttempt: 0,
-    status: "idle",
-  });
+  const [connectionState, setConnectionState] = useState<RoomSocketConnectionState>(
+    initialConnectionState,
+  );
   const socketRef = useRef<WebSocket | null>(null);
   const latestMoodRef = useRef<ClientMoodState | null>(currentMood);
   const reconnectAttemptRef = useRef(0);
@@ -43,10 +53,7 @@ export function useRoomMoodSocket(identity: StoredRoomIdentity | null) {
       socketRef.current?.close();
       socketRef.current = null;
       reconnectAttemptRef.current = 0;
-      setConnectionState({
-        reconnectAttempt: 0,
-        status: "idle",
-      });
+      setConnectionState(initialConnectionState());
       setRemoteMood(null);
       setRoomPresence([]);
       return undefined;
@@ -64,7 +71,7 @@ export function useRoomMoodSocket(identity: StoredRoomIdentity | null) {
       reconnectTimer = null;
     };
 
-    const scheduleReconnect = () => {
+    const scheduleReconnect = (event: CloseEvent) => {
       if (isDisposed) {
         return;
       }
@@ -78,6 +85,9 @@ export function useRoomMoodSocket(identity: StoredRoomIdentity | null) {
 
       setRoomPresence([]);
       setConnectionState({
+        lastCloseCode: event.code,
+        lastCloseReason: event.reason || null,
+        nextRetryMs: delay,
         reconnectAttempt,
         status: "reconnecting",
       });
@@ -138,6 +148,9 @@ export function useRoomMoodSocket(identity: StoredRoomIdentity | null) {
       }
 
       setConnectionState({
+        lastCloseCode: null,
+        lastCloseReason: null,
+        nextRetryMs: null,
         reconnectAttempt: reconnectAttemptRef.current,
         status: reconnectAttemptRef.current > 0 ? "reconnecting" : "connecting",
       });
@@ -153,6 +166,9 @@ export function useRoomMoodSocket(identity: StoredRoomIdentity | null) {
 
         reconnectAttemptRef.current = 0;
         setConnectionState({
+          lastCloseCode: null,
+          lastCloseReason: null,
+          nextRetryMs: null,
           reconnectAttempt: 0,
           status: "connected",
         });
@@ -163,15 +179,13 @@ export function useRoomMoodSocket(identity: StoredRoomIdentity | null) {
 
       socket.onmessage = handleRoomMessage;
 
-      socket.onclose = () => {
-        if (isDisposed) {
+      socket.onclose = (event) => {
+        if (isDisposed || socketRef.current !== socket) {
           return;
         }
 
-        if (socketRef.current === socket) {
-          socketRef.current = null;
-        }
-        scheduleReconnect();
+        socketRef.current = null;
+        scheduleReconnect(event);
       };
 
       socket.onerror = () => {
