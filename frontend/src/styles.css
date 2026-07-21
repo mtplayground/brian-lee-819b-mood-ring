@@ -116,6 +116,21 @@ a {
   filter: saturate(var(--painterly-saturation));
 }
 
+.theme-renderer--retro {
+  --retro-bezel-width: 18px;
+  --retro-grain-opacity: 0.18;
+  --retro-needle-rotation: 0deg;
+  --retro-panel-depth: 24px;
+  --retro-sweep-duration: 1500ms;
+  --retro-tick-opacity: 0.42;
+  --retro-warm-wash: 0.3;
+  --retro-warm-wash-percent: 30%;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, var(--retro-grain-opacity)) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(90deg, rgba(15, 23, 42, 0.16) 0 1px, transparent 1px 7px),
+    linear-gradient(140deg, color-mix(in srgb, #f59e0b 22%, var(--theme-bg-start)) 0%, var(--theme-bg-mid) 48%, color-mix(in srgb, #78350f 18%, var(--theme-bg-end)) 100%);
+}
+
 .app-header {
   position: relative;
   z-index: 2;
@@ -713,6 +728,87 @@ a {
   height: 42vh;
 }
 
+.theme-renderer--retro .app-header__symbol {
+  border-color: color-mix(in srgb, #fbbf24 46%, var(--theme-core));
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--theme-accent) 76%, #fef3c7) 0 34%, transparent 35%),
+    conic-gradient(from 210deg, var(--theme-core), #f59e0b, var(--theme-accent), var(--theme-core));
+  box-shadow:
+    inset 0 0 0 3px color-mix(in srgb, var(--theme-bg-start) 82%, #451a03),
+    0 0 var(--theme-glow-size) color-mix(in srgb, #f59e0b 28%, var(--theme-stage-core));
+}
+
+.theme-renderer--retro .route-panel {
+  border-color: color-mix(in srgb, #fbbf24 30%, rgba(255, 255, 255, var(--theme-border-strength)));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fef3c7 var(--retro-warm-wash-percent), transparent), transparent 36%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 10px),
+    color-mix(in srgb, var(--theme-surface) 84%, #451a03);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 0 0 1px rgba(69, 26, 3, 0.42),
+    0 var(--retro-panel-depth) 72px rgba(0, 0, 0, 0.34);
+}
+
+.theme-renderer--retro .button--primary {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--theme-accent) 82%, #fef3c7), color-mix(in srgb, var(--theme-core) 72%, #92400e));
+}
+
+.theme-renderer--retro .theme-stage {
+  height: 42vh;
+}
+
+.theme-renderer--retro .theme-stage__surface {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, transparent 0 18%, color-mix(in srgb, #451a03 34%, transparent) 100%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 9px),
+    linear-gradient(90deg, color-mix(in srgb, var(--theme-stage-core) 52%, #451a03), var(--theme-stage-accent), color-mix(in srgb, var(--theme-stage-glow) 62%, #111827));
+}
+
+.theme-renderer--retro .theme-stage__surface::before,
+.theme-renderer--retro .theme-stage__surface::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+.theme-renderer--retro .theme-stage__surface::before {
+  left: 50%;
+  bottom: -52%;
+  width: min(76vw, 48rem);
+  height: min(76vw, 48rem);
+  border: var(--retro-bezel-width) solid color-mix(in srgb, #fbbf24 28%, var(--theme-core));
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--theme-bg-start) 78%, #451a03) 0 35%, transparent 36%),
+    conic-gradient(from 224deg, transparent 0 11deg, rgba(255, 255, 255, var(--retro-tick-opacity)) 11deg 12deg, transparent 12deg 22deg),
+    conic-gradient(from 224deg, transparent 0 24deg, var(--theme-stage-core) 24deg 108deg, var(--theme-stage-accent) 108deg 182deg, var(--theme-stage-glow) 182deg 272deg, transparent 272deg 360deg);
+  box-shadow:
+    inset 0 0 42px rgba(0, 0, 0, 0.44),
+    0 0 50px color-mix(in srgb, var(--theme-stage-core) 26%, transparent);
+  mask-image: linear-gradient(to top, #000 0 58%, transparent 82%);
+  transform: translateX(-50%);
+}
+
+.theme-renderer--retro .theme-stage__surface::after {
+  left: 50%;
+  bottom: 8%;
+  width: min(28vw, 15rem);
+  height: 0.34rem;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, transparent 0 6%, #fef3c7 6% 16%, color-mix(in srgb, var(--theme-accent) 78%, #f97316) 16% 100%);
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--theme-accent) 42%, transparent),
+    -0.6rem 0 0 rgba(15, 23, 42, 0.62);
+  transform: translateX(-8%) rotate(var(--retro-needle-rotation));
+  transform-origin: 8% 50%;
+  animation: retro-needle-settle var(--retro-sweep-duration) var(--theme-easing) 1;
+}
+
 .theme-renderer--painterly .theme-stage__surface {
   position: relative;
   overflow: hidden;
@@ -891,6 +987,20 @@ a {
   }
 }
 
+@keyframes retro-needle-settle {
+  from {
+    transform: translateX(-8%) rotate(-62deg);
+  }
+
+  62% {
+    transform: translateX(-8%) rotate(var(--retro-needle-rotation));
+  }
+
+  to {
+    transform: translateX(-8%) rotate(var(--retro-needle-rotation));
+  }
+}
+
 @media (max-width: 720px) {
   .app-header {
     align-items: flex-start;
@@ -935,7 +1045,8 @@ a {
   .theme-renderer--organic .theme-stage__surface::after,
   .theme-renderer--geometric .theme-stage__surface::before,
   .theme-renderer--painterly .theme-stage__surface::before,
-  .theme-renderer--painterly .theme-stage__surface::after {
+  .theme-renderer--painterly .theme-stage__surface::after,
+  .theme-renderer--retro .theme-stage__surface::after {
     animation: none;
   }
 }
