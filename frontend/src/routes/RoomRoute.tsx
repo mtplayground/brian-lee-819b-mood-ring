@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ApiRequestError, joinRoom, type JoinRoomResponse } from "../api/rooms";
+import {
+  ApiRequestError,
+  getThemePreference,
+  joinRoom,
+  type JoinRoomResponse,
+} from "../api/rooms";
 import { MoodInputPanel } from "../components/mood/MoodInputPanel";
 import { useAppState } from "../state/AppStateContext";
 import {
@@ -26,7 +31,7 @@ const errorMessageFor = (error: unknown): string => {
 };
 
 export function RoomRoute() {
-  const { config } = useAppState();
+  const { config, setActiveRoomIdentity, setActiveThemeId } = useAppState();
   const { roomId } = useParams();
   const [identity, setIdentity] = useState<StoredRoomIdentity | null>(() =>
     roomId ? loadRoomIdentity(roomId) : null,
@@ -46,11 +51,23 @@ export function RoomRoute() {
 
     try {
       const joinedRoom = await joinRoom(config, roomId, storedIdentity?.identityKey);
-      storeRoomIdentity(joinedRoom.roomId, joinedRoom.participant);
-      setIdentity({
-        roomId: joinedRoom.roomId,
+      const themePreference = await getThemePreference(
+        config,
+        joinedRoom.roomId,
+        joinedRoom.participant,
+      ).catch(() => null);
+      const participant = {
         ...joinedRoom.participant,
-      });
+        lastUsedThemeId: themePreference?.themeId ?? joinedRoom.participant.lastUsedThemeId,
+      };
+      storeRoomIdentity(joinedRoom.roomId, participant);
+      const restoredIdentity = {
+        roomId: joinedRoom.roomId,
+        ...participant,
+      };
+      setIdentity(restoredIdentity);
+      setActiveThemeId(participant.lastUsedThemeId);
+      setActiveRoomIdentity(restoredIdentity);
       setJoinResult(joinedRoom);
       setStatus("joined");
     } catch (error) {
@@ -62,6 +79,7 @@ export function RoomRoute() {
   useEffect(() => {
     if (!roomId) {
       setIdentity(null);
+      setActiveRoomIdentity(null);
       setJoinResult(null);
       setStatus("idle");
       return;
@@ -69,6 +87,7 @@ export function RoomRoute() {
 
     const storedIdentity = loadRoomIdentity(roomId);
     setIdentity(storedIdentity);
+    setActiveRoomIdentity(null);
     setJoinResult(null);
     setErrorMessage(null);
 

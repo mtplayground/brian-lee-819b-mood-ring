@@ -1,11 +1,12 @@
 use axum::{
     extract::{Path, State},
+    http::HeaderMap,
     http::StatusCode,
     response::IntoResponse,
     Json,
 };
 use mood_ring_backend::domain::{
-    participant::{ParticipantId, ParticipantIdentityKey, ParticipantSlot},
+    participant::{ParticipantId, ParticipantIdentityKey, ParticipantSlot, ThemeId},
     room::RoomId,
 };
 use serde::{Deserialize, Serialize};
@@ -28,6 +29,7 @@ pub struct ParticipantIdentityResponse {
     pub participant_id: ParticipantId,
     pub identity_key: ParticipantIdentityKey,
     pub slot: ParticipantSlot,
+    pub last_used_theme_id: ThemeId,
 }
 
 #[derive(Debug, Deserialize)]
@@ -44,6 +46,22 @@ pub struct JoinRoomResponse {
     pub share_path: String,
     pub participant: ParticipantIdentityResponse,
     pub restored_identity: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThemePreferenceRequest {
+    pub identity_key: ParticipantIdentityKey,
+    pub theme_id: ThemeId,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThemePreferenceResponse {
+    pub participant_id: ParticipantId,
+    pub theme_id: ThemeId,
+    #[serde(with = "time::serde::rfc3339")]
+    pub updated_at: time::OffsetDateTime,
 }
 
 #[derive(Debug, Serialize)]
@@ -107,6 +125,99 @@ pub async fn join_room(
     }
 }
 
+pub async fn get_theme_preference(
+    Path((room_id, participant_id)): Path<(uuid::Uuid, uuid::Uuid)>,
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let Some(identity_key) = identity_key_from_headers(&headers) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "missing_identity_key",
+            }),
+        )
+            .into_response();
+    };
+
+    match room_service::get_participant_theme_preference(
+        &state.db,
+        RoomId::new(room_id),
+        ParticipantId::new(participant_id),
+        identity_key,
+    )
+    .await
+    {
+        Ok(preference) => {
+            (StatusCode::OK, Json(theme_preference_response(preference))).into_response()
+        }
+        Err(room_service::RoomServiceError::ParticipantNotFound) => (
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: "participant_not_found",
+            }),
+        )
+            .into_response(),
+        Err(error) => {
+            error!(%error, "failed to read participant theme preference");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: "theme_preference_read_failed",
+                }),
+            )
+                .into_response()
+        }
+    }
+}
+
+pub async fn update_theme_preference(
+    Path((room_id, participant_id)): Path<(uuid::Uuid, uuid::Uuid)>,
+    State(state): State<AppState>,
+    Json(request): Json<ThemePreferenceRequest>,
+) -> impl IntoResponse {
+    if !is_supported_theme_id(&request.theme_id) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "unsupported_theme_id",
+            }),
+        )
+            .into_response();
+    }
+
+    match room_service::update_participant_theme_preference(
+        &state.db,
+        RoomId::new(room_id),
+        ParticipantId::new(participant_id),
+        request.identity_key,
+        request.theme_id,
+    )
+    .await
+    {
+        Ok(preference) => {
+            (StatusCode::OK, Json(theme_preference_response(preference))).into_response()
+        }
+        Err(room_service::RoomServiceError::ParticipantNotFound) => (
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: "participant_not_found",
+            }),
+        )
+            .into_response(),
+        Err(error) => {
+            error!(%error, "failed to update participant theme preference");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: "theme_preference_update_failed",
+                }),
+            )
+                .into_response()
+        }
+    }
+}
+
 fn create_room_response(created_room: room_service::CreatedRoom) -> CreateRoomResponse {
     let room_id = created_room.room.id;
 
@@ -137,7 +248,32 @@ fn participant_identity_response(
         participant_id: participant.id,
         identity_key: participant.identity_key,
         slot: participant.slot,
+        last_used_theme_id: participant.last_used_theme_id,
     }
+}
+
+fn theme_preference_response(
+    preference: room_service::ParticipantThemePreference,
+) -> ThemePreferenceResponse {
+    ThemePreferenceResponse {
+        participant_id: preference.participant_id,
+        theme_id: preference.theme_id,
+        updated_at: preference.updated_at,
+    }
+}
+
+fn identity_key_from_headers(headers: &HeaderMap) -> Option<ParticipantIdentityKey> {
+    headers
+        .get("x-participant-identity-key")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| ParticipantIdentityKey::new(value).ok())
+}
+
+fn is_supported_theme_id(theme_id: &ThemeId) -> bool {
+    matches!(
+        theme_id.as_str(),
+        "organic" | "geometric" | "painterly" | "retro"
+    )
 }
 
 #[cfg(test)]
@@ -181,6 +317,7 @@ mod tests {
         );
         assert_eq!(json["creatorParticipant"]["identityKey"], "creator-key");
         assert_eq!(json["creatorParticipant"]["slot"], "first");
+        assert_eq!(json["creatorParticipant"]["lastUsedThemeId"], "organic");
     }
 
     #[test]
@@ -211,6 +348,31 @@ mod tests {
         assert_eq!(json["participant"]["participantId"], participant_id.value().to_string());
         assert_eq!(json["participant"]["identityKey"], "returning-key");
         assert_eq!(json["participant"]["slot"], "second");
+        assert_eq!(json["participant"]["lastUsedThemeId"], "organic");
         assert_eq!(json["restoredIdentity"], true);
+    }
+
+    #[test]
+    fn theme_preference_response_uses_camel_case_payload() {
+        let now = OffsetDateTime::UNIX_EPOCH;
+        let participant_id = ParticipantId::generate();
+        let preference = room_service::ParticipantThemePreference {
+            participant_id,
+            theme_id: ThemeId::new("retro").expect("theme id"),
+            updated_at: now,
+        };
+
+        let response = theme_preference_response(preference);
+        let json = serde_json::to_value(response).expect("response json");
+
+        assert_eq!(json["participantId"], participant_id.value().to_string());
+        assert_eq!(json["themeId"], "retro");
+        assert!(json["updatedAt"].is_string());
+    }
+
+    #[test]
+    fn unsupported_theme_ids_are_rejected_before_persistence() {
+        assert!(is_supported_theme_id(&ThemeId::new("organic").expect("theme id")));
+        assert!(!is_supported_theme_id(&ThemeId::new("unknown").expect("theme id")));
     }
 }

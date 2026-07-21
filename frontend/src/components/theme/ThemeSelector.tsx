@@ -1,5 +1,8 @@
+import { useEffect } from "react";
+import { updateThemePreference } from "../../api/rooms";
 import { creativeThemeChoices, type CreativeThemeId } from "../../theme";
 import { useAppState } from "../../state/AppStateContext";
+import { storeRoomIdentity } from "../../state/roomIdentity";
 
 const nextThemeId = (activeThemeId: CreativeThemeId): CreativeThemeId => {
   const activeIndex = creativeThemeChoices.findIndex((choice) => choice.id === activeThemeId);
@@ -9,7 +12,37 @@ const nextThemeId = (activeThemeId: CreativeThemeId): CreativeThemeId => {
 };
 
 export function ThemeSelector() {
-  const { activeThemeId, setActiveThemeId } = useAppState();
+  const { activeRoomIdentity, activeThemeId, config, setActiveRoomIdentity, setActiveThemeId } =
+    useAppState();
+
+  useEffect(() => {
+    if (!activeRoomIdentity || activeRoomIdentity.lastUsedThemeId === activeThemeId) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    updateThemePreference(config, activeRoomIdentity.roomId, activeRoomIdentity, activeThemeId)
+      .then((preference) => {
+        if (cancelled) {
+          return;
+        }
+
+        const nextIdentity = {
+          ...activeRoomIdentity,
+          lastUsedThemeId: preference.themeId,
+        };
+        storeRoomIdentity(nextIdentity.roomId, nextIdentity);
+        setActiveRoomIdentity(nextIdentity);
+      })
+      .catch((error: unknown) => {
+        console.warn("Unable to save theme preference", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeRoomIdentity, activeThemeId, config, setActiveRoomIdentity]);
 
   return (
     <div className="theme-selector" aria-label="Creative lens">

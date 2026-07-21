@@ -1,4 +1,5 @@
 import type { ClientConfig } from "./config";
+import type { CreativeThemeId } from "../theme";
 
 export type ParticipantSlot = "first" | "second";
 
@@ -6,6 +7,7 @@ export type ParticipantIdentity = {
   participantId: string;
   identityKey: string;
   slot: ParticipantSlot;
+  lastUsedThemeId: CreativeThemeId;
 };
 
 export type CreateRoomResponse = {
@@ -21,6 +23,12 @@ export type JoinRoomResponse = {
   sharePath: string;
   participant: ParticipantIdentity;
   restoredIdentity: boolean;
+};
+
+export type ThemePreferenceResponse = {
+  participantId: string;
+  themeId: CreativeThemeId;
+  updatedAt: string;
 };
 
 type ApiErrorPayload = {
@@ -74,6 +82,63 @@ export async function joinRoom(
   }
 
   return response.json() as Promise<JoinRoomResponse>;
+}
+
+export async function getThemePreference(
+  config: ClientConfig,
+  roomId: string,
+  participant: ParticipantIdentity,
+): Promise<ThemePreferenceResponse> {
+  const response = await fetch(
+    `${config.backendBaseUrl}/api/rooms/${encodeURIComponent(roomId)}/participants/${encodeURIComponent(
+      participant.participantId,
+    )}/theme-preference`,
+    {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        "X-Participant-Identity-Key": participant.identityKey,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw await createApiRequestError(response, "Unable to read theme preference");
+  }
+
+  return response.json() as Promise<ThemePreferenceResponse>;
+}
+
+export async function updateThemePreference(
+  config: ClientConfig,
+  roomId: string,
+  participant: ParticipantIdentity,
+  themeId: CreativeThemeId,
+): Promise<ThemePreferenceResponse> {
+  const response = await fetch(
+    `${config.backendBaseUrl}/api/rooms/${encodeURIComponent(roomId)}/participants/${encodeURIComponent(
+      participant.participantId,
+    )}/theme-preference`,
+    {
+      method: "PUT",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        identityKey: participant.identityKey,
+        themeId,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw await createApiRequestError(response, "Unable to save theme preference");
+  }
+
+  return response.json() as Promise<ThemePreferenceResponse>;
 }
 
 async function createApiRequestError(response: Response, fallbackMessage: string): Promise<ApiRequestError> {

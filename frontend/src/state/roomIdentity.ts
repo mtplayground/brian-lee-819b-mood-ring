@@ -1,4 +1,5 @@
 import type { ParticipantIdentity } from "../api/rooms";
+import { isCreativeThemeId } from "../theme";
 
 export type StoredRoomIdentity = ParticipantIdentity & {
   roomId: string;
@@ -42,6 +43,10 @@ export function loadRoomIdentity(roomId: string): StoredRoomIdentity | null {
       participantId: value.participantId,
       identityKey: value.identityKey,
       slot: value.slot,
+      lastUsedThemeId:
+        typeof value.lastUsedThemeId === "string" && isCreativeThemeId(value.lastUsedThemeId)
+          ? value.lastUsedThemeId
+          : "organic",
     };
   } catch {
     return null;
