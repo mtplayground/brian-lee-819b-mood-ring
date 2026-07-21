@@ -423,11 +423,48 @@ a {
   line-height: 1.15;
 }
 
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.connection-status__dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #94a3b8;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #94a3b8 18%, transparent);
+}
+
+.connection-status--live .connection-status__dot {
+  background: #34d399;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #34d399 18%, transparent);
+}
+
+.connection-status--solo .connection-status__dot {
+  background: #fbbf24;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #fbbf24 18%, transparent);
+}
+
+.connection-status--reconnecting .connection-status__dot {
+  background: #fb7185;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #fb7185 18%, transparent);
+  animation: status-pulse 1.2s ease-in-out infinite;
+}
+
 .presence-panel p:not(.route-panel__eyebrow),
 .remote-mood p:not(.route-panel__eyebrow) {
   margin: 0;
   color: var(--theme-muted-text);
   font-size: 0.96rem;
+}
+
+.presence-panel .connection-status__meta {
+  margin-top: -0.25rem;
+  color: color-mix(in srgb, var(--theme-muted-text) 72%, #ffffff);
+  font-size: 0.82rem;
 }
 
 .shared-canvas {
@@ -1476,6 +1513,19 @@ a {
 
   100% {
     transform: scale(0.96);
+  }
+}
+
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.62;
+    transform: scale(0.82);
   }
 }
 
