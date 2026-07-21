@@ -110,16 +110,26 @@ export function RoomRoute() {
 
   const isJoined = status === "joined" && identity;
   const isReturning = Boolean(joinResult?.restoredIdentity);
-  useRoomMoodSocket(isJoined ? identity : null);
+  const socketConnection = useRoomMoodSocket(isJoined ? identity : null);
 
   const otherParticipants = identity
     ? roomPresence.filter((participant) => participant.participantId !== identity.participantId)
     : [];
-  const connectionMode = otherParticipants.length > 0 ? "Live together" : "Postcard mode";
-  const connectionMessage =
-    otherParticipants.length > 0
+  const isSocketReady = socketConnection.status === "connected";
+  const connectionMode = isSocketReady
+    ? otherParticipants.length > 0
+      ? "Live together"
+      : "Postcard mode"
+    : socketConnection.status === "reconnecting"
+      ? "Reconnecting"
+      : "Connecting";
+  const connectionMessage = isSocketReady
+    ? otherParticipants.length > 0
       ? "The other person is here now. Mood changes are live."
-      : "You are connected. The other person will see updates when they return.";
+      : "You are connected. The other person will see updates when they return."
+    : socketConnection.status === "reconnecting"
+      ? `Connection dropped. Reconnecting attempt ${socketConnection.reconnectAttempt}.`
+      : "Opening the live room connection.";
 
   const remoteMoodSummary = remoteMood
     ? [
