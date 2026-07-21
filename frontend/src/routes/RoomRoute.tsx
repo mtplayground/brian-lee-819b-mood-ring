@@ -7,6 +7,7 @@ import {
   type JoinRoomResponse,
 } from "../api/rooms";
 import { MoodInputPanel } from "../components/mood/MoodInputPanel";
+import { SharedMoodCanvas } from "../components/mood/SharedMoodCanvas";
 import { useAppState } from "../state/AppStateContext";
 import {
   loadRoomIdentity,
@@ -33,7 +34,9 @@ const errorMessageFor = (error: unknown): string => {
 
 export function RoomRoute() {
   const {
+    activeThemeId,
     config,
+    currentMood,
     remoteMood,
     roomPresence,
     setActiveRoomIdentity,
@@ -213,6 +216,12 @@ export function RoomRoute() {
             <h2 id="presence-heading">{connectionMode}</h2>
             <p>{connectionMessage}</p>
           </section>
+
+          <SharedMoodCanvas
+            activeThemeId={activeThemeId}
+            localMood={currentMood}
+            remoteMood={remoteMood?.mood ?? null}
+          />
 
           <MoodInputPanel />
 
