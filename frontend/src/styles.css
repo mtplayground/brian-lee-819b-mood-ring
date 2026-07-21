@@ -401,6 +401,32 @@ a {
   font-weight: 700;
 }
 
+.remote-mood {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--theme-accent) 32%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--theme-core) 14%, rgba(15, 23, 42, 0.42));
+  transition:
+    background var(--theme-motion-duration) var(--theme-easing),
+    border-color var(--theme-motion-duration) var(--theme-easing);
+}
+
+.remote-mood h2 {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(1.15rem, 3vw, 1.55rem);
+  line-height: 1.15;
+}
+
+.remote-mood p:not(.route-panel__eyebrow) {
+  margin: 0;
+  color: var(--theme-muted-text);
+  font-size: 0.96rem;
+}
+
 .mood-input {
   display: grid;
   gap: 1rem;
