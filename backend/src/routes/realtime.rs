@@ -9,11 +9,13 @@ use axum::{
 };
 use futures_util::{SinkExt, StreamExt};
 use mood_ring_backend::domain::{
+    mood::MoodValue,
     participant::{Participant, ParticipantId, ParticipantIdentityKey, ParticipantSlot},
     room::RoomId,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sqlx::PgPool;
 use tokio::sync::broadcast;
 use tracing::{debug, warn};
 
@@ -58,6 +60,18 @@ struct ErrorResponse {
     error: &'static str,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "type")]
+enum ClientMoodMessage {
+    MoodUpdate { mood: ClientMoodEnvelope },
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ClientMoodEnvelope {
+    value: MoodValue,
+}
+
 pub async fn room_websocket(
     Path(room_id): Path<uuid::Uuid>,
     State(state): State<AppState>,
@@ -97,13 +111,14 @@ pub async fn room_websocket(
 
     websocket
         .on_upgrade(move |socket| {
-            handle_room_socket(socket, state.room_channels, room_id, participant)
+            handle_room_socket(socket, state.db, state.room_channels, room_id, participant)
         })
         .into_response()
 }
 
 async fn handle_room_socket(
     socket: WebSocket,
+    db: PgPool,
     registry: RoomChannelRegistry,
     room_id: RoomId,
     participant: Participant,
@@ -148,6 +163,13 @@ async fn handle_room_socket(
                 match socket_message {
                     Some(Ok(Message::Text(text))) => {
                         let payload = client_payload_from_text(text.to_string());
+                        persist_mood_snapshot_from_payload(
+                            &db,
+                            room_id,
+                            participant_id,
+                            &payload,
+                        )
+                        .await;
                         broadcast_event(
                             &room_sender,
                             RoomWebSocketEvent::ParticipantMessage {
@@ -190,6 +212,53 @@ async fn handle_room_socket(
 
 fn client_payload_from_text(text: String) -> Value {
     serde_json::from_str(&text).unwrap_or(Value::String(text))
+}
+
+async fn persist_mood_snapshot_from_payload(
+    db: &PgPool,
+    room_id: RoomId,
+    participant_id: ParticipantId,
+    payload: &Value,
+) {
+    let Some(snapshot) = mood_snapshot_from_client_payload(payload) else {
+        return;
+    };
+
+    match snapshot {
+        Ok(mood) => {
+            if let Err(error) =
+                room_service::update_participant_latest_mood(
+                    db,
+                    room_id,
+                    participant_id,
+                    Some(mood),
+                )
+                .await
+            {
+                warn!(%error, ?participant_id, ?room_id, "failed to persist latest mood snapshot");
+            }
+        }
+        Err(error) => {
+            warn!(%error, ?participant_id, ?room_id, "invalid mood snapshot payload");
+        }
+    }
+}
+
+fn mood_snapshot_from_client_payload(
+    payload: &Value,
+) -> Option<Result<MoodValue, serde_json::Error>> {
+    let payload_type = payload.get("type").and_then(Value::as_str)?;
+
+    match payload_type {
+        "moodUpdate" => Some(
+            serde_json::from_value::<ClientMoodMessage>(payload.clone()).map(|message| {
+                match message {
+                    ClientMoodMessage::MoodUpdate { mood } => mood.value,
+                }
+            }),
+        ),
+        _ => None,
+    }
 }
 
 fn broadcast_event(
@@ -256,5 +325,36 @@ mod tests {
         let payload = client_payload_from_text("hello".to_owned());
 
         assert_eq!(payload, Value::String("hello".to_owned()));
+    }
+
+    #[test]
+    fn mood_update_payload_extracts_canonical_mood_value() {
+        let payload = serde_json::json!({
+            "type": "moodUpdate",
+            "mood": {
+                "value": {
+                    "presetId": "calm",
+                    "intensity": 0.75,
+                    "note": "steady"
+                },
+                "selectedPreset": {},
+                "blendDialValue": 50,
+                "updatedAt": "2026-07-21T00:00:00Z"
+            }
+        });
+
+        let snapshot = mood_snapshot_from_client_payload(&payload)
+            .expect("mood message")
+            .expect("valid mood");
+
+        assert_eq!(snapshot.preset_id.as_str(), "calm");
+        assert_eq!(snapshot.note.as_ref().map(|note| note.as_str()), Some("steady"));
+    }
+
+    #[test]
+    fn mood_clear_payload_is_ignored_for_snapshot_persistence() {
+        let payload = serde_json::json!({ "type": "moodClear" });
+
+        assert!(mood_snapshot_from_client_payload(&payload).is_none());
     }
 }

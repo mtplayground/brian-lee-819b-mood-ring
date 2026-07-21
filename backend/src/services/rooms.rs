@@ -239,6 +239,54 @@ pub async fn update_participant_theme_preference(
     }
 }
 
+pub async fn update_participant_latest_mood(
+    pool: &PgPool,
+    room_id: RoomId,
+    participant_id: ParticipantId,
+    mood: Option<MoodValue>,
+) -> Result<Option<ParticipantMoodSnapshot>, RoomServiceError> {
+    let row: Option<(Option<Json<MoodValue>>, Option<OffsetDateTime>)> = match mood {
+        Some(mood) => {
+            sqlx::query_as(
+                r#"
+                UPDATE participants
+                SET latest_mood = $3, latest_mood_updated_at = NOW(), updated_at = NOW()
+                WHERE room_id = $1 AND id = $2
+                RETURNING latest_mood, latest_mood_updated_at
+                "#,
+            )
+            .bind(room_id.value())
+            .bind(participant_id.value())
+            .bind(Json(mood))
+            .fetch_optional(pool)
+            .await?
+        }
+        None => {
+            sqlx::query_as(
+                r#"
+                UPDATE participants
+                SET latest_mood = NULL, latest_mood_updated_at = NULL, updated_at = NOW()
+                WHERE room_id = $1 AND id = $2
+                RETURNING latest_mood, latest_mood_updated_at
+                "#,
+            )
+            .bind(room_id.value())
+            .bind(participant_id.value())
+            .fetch_optional(pool)
+            .await?
+        }
+    };
+
+    match row {
+        Some((Some(Json(mood)), Some(updated_at))) => {
+            Ok(Some(ParticipantMoodSnapshot::new(mood, updated_at)))
+        }
+        Some((None, None)) => Ok(None),
+        Some(_) => Err(RoomServiceError::Database(sqlx::Error::RowNotFound)),
+        None => Err(RoomServiceError::ParticipantNotFound),
+    }
+}
+
 pub async fn authenticate_room_participant(
     pool: &PgPool,
     room_id: RoomId,
