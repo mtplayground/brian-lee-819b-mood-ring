@@ -47,9 +47,58 @@ export function RootLayout({ children }: PropsWithChildren) {
 
       <main className="app-main">{children}</main>
 
+      <MctaiWatermark />
+
       <div className="theme-stage" aria-hidden="true" style={themeRender.stageStyle}>
         <div className="theme-stage__surface" />
       </div>
+    </div>
+  );
+}
+
+
+function MctaiWatermark() {
+  const [canMount, setCanMount] = useState(false);
+  const [shareLabel, setShareLabel] = useState("Share");
+
+  useEffect(() => {
+    if (!document.getElementById("mctai-watermark")) {
+      setCanMount(true);
+    }
+  }, []);
+
+  const handleShare = async () => {
+    const payload = {
+      title: document.title || "Ideavibes app",
+      text: "Built with Ideavibes.ai",
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(payload);
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(window.location.href);
+        setShareLabel("Copied");
+        window.setTimeout(() => setShareLabel("Share"), 1600);
+      }
+    } catch {
+      setShareLabel("Share");
+    }
+  };
+
+  if (!canMount) {
+    return null;
+  }
+
+  return (
+    <div id="mctai-watermark" aria-label="Ideavibes watermark">
+      <a href="https://ideavibes.ai" target="_blank" rel="noopener noreferrer">
+        Built by Ideavibes.ai
+      </a>
+      <button type="button" onClick={handleShare}>
+        {shareLabel}
+      </button>
     </div>
   );
 }
