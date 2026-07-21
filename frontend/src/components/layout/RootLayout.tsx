@@ -1,14 +1,14 @@
 import { useMemo, type PropsWithChildren } from "react";
 import { Link } from "react-router-dom";
 import { useAppState } from "../../state/AppStateContext";
-import { moodToThemeTokens, painterlyThemeRenderer } from "../../theme";
+import { moodToThemeTokens, retroThemeRenderer } from "../../theme";
 
 export function RootLayout({ children }: PropsWithChildren) {
   const { config, currentMood } = useAppState();
   const themeRender = useMemo(() => {
     const tokens = moodToThemeTokens(currentMood);
 
-    return painterlyThemeRenderer.render(tokens, currentMood);
+    return retroThemeRenderer.render(tokens, currentMood);
   }, [currentMood]);
 
   return (
