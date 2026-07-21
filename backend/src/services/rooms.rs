@@ -32,6 +32,12 @@ pub struct ParticipantThemePreference {
     pub updated_at: OffsetDateTime,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct OtherParticipantMoodSnapshot {
+    pub participant_id: Option<ParticipantId>,
+    pub snapshot: Option<ParticipantMoodSnapshot>,
+}
+
 #[derive(Debug)]
 pub enum RoomServiceError {
     Database(sqlx::Error),
@@ -287,6 +293,58 @@ pub async fn update_participant_latest_mood(
     }
 }
 
+pub async fn get_other_participant_latest_mood(
+    pool: &PgPool,
+    room_id: RoomId,
+    participant_id: ParticipantId,
+    identity_key: ParticipantIdentityKey,
+) -> Result<OtherParticipantMoodSnapshot, RoomServiceError> {
+    let requesting_participant: Option<(Uuid,)> = sqlx::query_as(
+        r#"
+        SELECT id
+        FROM participants
+        WHERE room_id = $1 AND id = $2 AND identity_key = $3
+        "#,
+    )
+    .bind(room_id.value())
+    .bind(participant_id.value())
+    .bind(identity_key.as_str())
+    .fetch_optional(pool)
+    .await?;
+
+    if requesting_participant.is_none() {
+        return Err(RoomServiceError::ParticipantNotFound);
+    }
+
+    let other_participant: Option<(Uuid, Option<Json<MoodValue>>, Option<OffsetDateTime>)> =
+        sqlx::query_as(
+            r#"
+            SELECT id, latest_mood, latest_mood_updated_at
+            FROM participants
+            WHERE room_id = $1 AND id != $2
+            ORDER BY slot ASC
+            LIMIT 1
+            "#,
+        )
+        .bind(room_id.value())
+        .bind(participant_id.value())
+        .fetch_optional(pool)
+        .await?;
+
+    let Some((other_participant_id, latest_mood, latest_mood_updated_at)) = other_participant
+    else {
+        return Ok(OtherParticipantMoodSnapshot {
+            participant_id: None,
+            snapshot: None,
+        });
+    };
+
+    Ok(OtherParticipantMoodSnapshot {
+        participant_id: Some(ParticipantId::new(other_participant_id)),
+        snapshot: participant_mood_snapshot_from_columns(latest_mood, latest_mood_updated_at),
+    })
+}
+
 pub async fn authenticate_room_participant(
     pool: &PgPool,
     room_id: RoomId,
@@ -455,12 +513,7 @@ fn participant_from_row(row: ParticipantRow) -> Result<Participant, RoomServiceE
         updated_at,
     ) = row;
 
-    let latest_mood = match (latest_mood, latest_mood_updated_at) {
-        (Some(Json(mood)), Some(updated_at)) => {
-            Some(ParticipantMoodSnapshot::new(mood, updated_at))
-        }
-        _ => None,
-    };
+    let latest_mood = participant_mood_snapshot_from_columns(latest_mood, latest_mood_updated_at);
 
     Ok(Participant {
         id: ParticipantId::new(id),
@@ -472,6 +525,18 @@ fn participant_from_row(row: ParticipantRow) -> Result<Participant, RoomServiceE
         created_at,
         updated_at,
     })
+}
+
+fn participant_mood_snapshot_from_columns(
+    latest_mood: Option<Json<MoodValue>>,
+    latest_mood_updated_at: Option<OffsetDateTime>,
+) -> Option<ParticipantMoodSnapshot> {
+    match (latest_mood, latest_mood_updated_at) {
+        (Some(Json(mood)), Some(updated_at)) => {
+            Some(ParticipantMoodSnapshot::new(mood, updated_at))
+        }
+        _ => None,
+    }
 }
 
 #[cfg(test)]

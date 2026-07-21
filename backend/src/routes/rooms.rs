@@ -65,6 +65,13 @@ pub struct ThemePreferenceResponse {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LatestSnapshotResponse {
+    pub participant_id: Option<ParticipantId>,
+    pub snapshot: Option<mood_ring_backend::domain::participant::ParticipantMoodSnapshot>,
+}
+
+#[derive(Debug, Serialize)]
 struct ErrorResponse {
     error: &'static str,
 }
@@ -218,6 +225,52 @@ pub async fn update_theme_preference(
     }
 }
 
+pub async fn get_latest_snapshot(
+    Path((room_id, participant_id)): Path<(uuid::Uuid, uuid::Uuid)>,
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let Some(identity_key) = identity_key_from_headers(&headers) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                error: "missing_identity_key",
+            }),
+        )
+            .into_response();
+    };
+
+    match room_service::get_other_participant_latest_mood(
+        &state.db,
+        RoomId::new(room_id),
+        ParticipantId::new(participant_id),
+        identity_key,
+    )
+    .await
+    {
+        Ok(snapshot) => {
+            (StatusCode::OK, Json(latest_snapshot_response(snapshot))).into_response()
+        }
+        Err(room_service::RoomServiceError::ParticipantNotFound) => (
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+                error: "participant_not_found",
+            }),
+        )
+            .into_response(),
+        Err(error) => {
+            error!(%error, "failed to read latest participant mood snapshot");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: "latest_snapshot_read_failed",
+                }),
+            )
+                .into_response()
+        }
+    }
+}
+
 fn create_room_response(created_room: room_service::CreatedRoom) -> CreateRoomResponse {
     let room_id = created_room.room.id;
 
@@ -262,6 +315,15 @@ fn theme_preference_response(
     }
 }
 
+fn latest_snapshot_response(
+    snapshot: room_service::OtherParticipantMoodSnapshot,
+) -> LatestSnapshotResponse {
+    LatestSnapshotResponse {
+        participant_id: snapshot.participant_id,
+        snapshot: snapshot.snapshot,
+    }
+}
+
 fn identity_key_from_headers(headers: &HeaderMap) -> Option<ParticipantIdentityKey> {
     headers
         .get("x-participant-identity-key")
@@ -280,6 +342,7 @@ fn is_supported_theme_id(theme_id: &ThemeId) -> bool {
 mod tests {
     use super::*;
     use mood_ring_backend::domain::{
+        mood::{MoodIntensity, MoodPresetId, MoodValue},
         participant::{Participant, ThemeId},
         room::Room,
     };
@@ -368,6 +431,42 @@ mod tests {
         assert_eq!(json["participantId"], participant_id.value().to_string());
         assert_eq!(json["themeId"], "retro");
         assert!(json["updatedAt"].is_string());
+    }
+
+    #[test]
+    fn latest_snapshot_response_includes_other_participant_snapshot() {
+        let now = OffsetDateTime::UNIX_EPOCH;
+        let participant_id = ParticipantId::generate();
+        let mood = MoodValue::new(
+            MoodPresetId::new("calm").expect("preset id"),
+            MoodIntensity::new(0.35).expect("intensity"),
+            None,
+        );
+        let snapshot = room_service::OtherParticipantMoodSnapshot {
+            participant_id: Some(participant_id),
+            snapshot: Some(
+                mood_ring_backend::domain::participant::ParticipantMoodSnapshot::new(mood, now),
+            ),
+        };
+
+        let response = latest_snapshot_response(snapshot);
+        let json = serde_json::to_value(response).expect("response json");
+
+        assert_eq!(json["participantId"], participant_id.value().to_string());
+        assert_eq!(json["snapshot"]["mood"]["presetId"], "calm");
+        assert!(json["snapshot"]["updatedAt"].is_string());
+    }
+
+    #[test]
+    fn latest_snapshot_response_allows_absent_other_participant() {
+        let response = latest_snapshot_response(room_service::OtherParticipantMoodSnapshot {
+            participant_id: None,
+            snapshot: None,
+        });
+        let json = serde_json::to_value(response).expect("response json");
+
+        assert!(json["participantId"].is_null());
+        assert!(json["snapshot"].is_null());
     }
 
     #[test]
