@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState, type PropsWithChildren } from "react";
 import type { ClientConfig } from "../api/config";
+import type { PresenceParticipant } from "../api/realtime";
 import type { CreativeThemeId } from "../theme";
 import type { ClientMoodState } from "./clientMood";
 import type { StoredRoomIdentity } from "./roomIdentity";
@@ -19,10 +20,12 @@ export type AppState = {
   config: ClientConfig;
   currentMood: ClientMoodState | null;
   remoteMood: RemoteParticipantMood | null;
+  roomPresence: PresenceParticipant[];
   setActiveRoomIdentity: (identity: StoredRoomIdentity | null) => void;
   setActiveThemeId: (themeId: CreativeThemeId) => void;
   setCurrentMood: (currentMood: ClientMoodState | null) => void;
   setRemoteMood: (remoteMood: RemoteParticipantMood | null) => void;
+  setRoomPresence: (presence: PresenceParticipant[]) => void;
   themeMode: AppThemeMode;
   setThemeMode: (themeMode: AppThemeMode) => void;
 };
@@ -38,6 +41,7 @@ export function AppStateProvider({ children, config }: AppStateProviderProps) {
   const [activeThemeId, setActiveThemeId] = useState<CreativeThemeId>("retro");
   const [currentMood, setCurrentMood] = useState<ClientMoodState | null>(null);
   const [remoteMood, setRemoteMood] = useState<RemoteParticipantMood | null>(null);
+  const [roomPresence, setRoomPresence] = useState<PresenceParticipant[]>([]);
   const [themeMode, setThemeMode] = useState<AppThemeMode>("system");
 
   const value = useMemo<AppState>(
@@ -47,14 +51,24 @@ export function AppStateProvider({ children, config }: AppStateProviderProps) {
       config,
       currentMood,
       remoteMood,
+      roomPresence,
       setActiveRoomIdentity,
       setActiveThemeId,
       setCurrentMood,
       setRemoteMood,
+      setRoomPresence,
       themeMode,
       setThemeMode,
     }),
-    [activeRoomIdentity, activeThemeId, config, currentMood, remoteMood, themeMode],
+    [
+      activeRoomIdentity,
+      activeThemeId,
+      config,
+      currentMood,
+      remoteMood,
+      roomPresence,
+      themeMode,
+    ],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

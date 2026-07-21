@@ -19,7 +19,7 @@ use tracing::{debug, warn};
 
 use crate::{
     services::{
-        realtime::{RoomChannelMessage, RoomChannelRegistry},
+        realtime::{PresenceParticipant, RoomChannelMessage, RoomChannelRegistry},
         rooms as room_service,
     },
     state::AppState,
@@ -47,6 +47,9 @@ enum RoomWebSocketEvent {
         participant_id: ParticipantId,
         slot: ParticipantSlot,
         payload: Value,
+    },
+    PresenceSnapshot {
+        participants: Vec<PresenceParticipant>,
     },
 }
 
@@ -111,14 +114,20 @@ async fn handle_room_socket(
     let room_sender = channel.sender;
     let participant_id = participant.id;
     let participant_slot = participant.slot;
+    let connected_presence = registry
+        .connect_participant(room_id, participant_id, participant_slot)
+        .await;
 
-    broadcast_event(
-        &room_sender,
-        RoomWebSocketEvent::ParticipantConnected {
-            participant_id,
-            slot: participant_slot,
-        },
-    );
+    if connected_presence.changed_presence {
+        broadcast_event(
+            &room_sender,
+            RoomWebSocketEvent::ParticipantConnected {
+                participant_id,
+                slot: participant_slot,
+            },
+        );
+    }
+    broadcast_presence_snapshot(&room_sender, connected_presence.participants);
 
     loop {
         tokio::select! {
@@ -162,13 +171,19 @@ async fn handle_room_socket(
         }
     }
 
-    broadcast_event(
-        &room_sender,
-        RoomWebSocketEvent::ParticipantDisconnected {
-            participant_id,
-            slot: participant_slot,
-        },
-    );
+    let disconnected_presence = registry
+        .disconnect_participant(room_id, participant_id)
+        .await;
+    if disconnected_presence.changed_presence {
+        broadcast_event(
+            &room_sender,
+            RoomWebSocketEvent::ParticipantDisconnected {
+                participant_id,
+                slot: participant_slot,
+            },
+        );
+    }
+    broadcast_presence_snapshot(&room_sender, disconnected_presence.participants);
     drop(room_receiver);
     registry.remove_if_empty(room_id).await;
 }
@@ -191,6 +206,13 @@ fn broadcast_event(
     }
 }
 
+fn broadcast_presence_snapshot(
+    sender: &broadcast::Sender<RoomChannelMessage>,
+    participants: Vec<PresenceParticipant>,
+) {
+    broadcast_event(sender, RoomWebSocketEvent::PresenceSnapshot { participants });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -210,6 +232,23 @@ mod tests {
         assert_eq!(value["participantId"], participant_id.value().to_string());
         assert_eq!(value["slot"], "second");
         assert_eq!(value["payload"]["kind"], "mood-preview");
+    }
+
+    #[test]
+    fn presence_snapshot_serializes_connected_participants() {
+        let participant_id = ParticipantId::generate();
+        let event = RoomWebSocketEvent::PresenceSnapshot {
+            participants: vec![PresenceParticipant {
+                participant_id,
+                slot: ParticipantSlot::First,
+            }],
+        };
+
+        let value = serde_json::to_value(event).expect("event json");
+
+        assert_eq!(value["type"], "presenceSnapshot");
+        assert_eq!(value["participants"][0]["participantId"], participant_id.value().to_string());
+        assert_eq!(value["participants"][0]["slot"], "first");
     }
 
     #[test]

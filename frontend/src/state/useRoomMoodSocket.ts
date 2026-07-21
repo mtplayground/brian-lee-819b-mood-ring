@@ -11,7 +11,7 @@ import type { ClientMoodState } from "./clientMood";
 import type { StoredRoomIdentity } from "./roomIdentity";
 
 export function useRoomMoodSocket(identity: StoredRoomIdentity | null) {
-  const { config, currentMood, setRemoteMood } = useAppState();
+  const { config, currentMood, setRemoteMood, setRoomPresence } = useAppState();
   const socketRef = useRef<WebSocket | null>(null);
   const latestMoodRef = useRef<ClientMoodState | null>(currentMood);
 
@@ -24,6 +24,7 @@ export function useRoomMoodSocket(identity: StoredRoomIdentity | null) {
       socketRef.current?.close();
       socketRef.current = null;
       setRemoteMood(null);
+      setRoomPresence([]);
       return undefined;
     }
 
@@ -41,7 +42,16 @@ export function useRoomMoodSocket(identity: StoredRoomIdentity | null) {
       }
 
       const roomEvent = parseRoomSocketEvent(event.data);
-      if (!roomEvent || roomEvent.type !== "participantMessage") {
+      if (!roomEvent) {
+        return;
+      }
+
+      if (roomEvent.type === "presenceSnapshot") {
+        setRoomPresence(roomEvent.participants);
+        return;
+      }
+
+      if (roomEvent.type !== "participantMessage") {
         return;
       }
 
@@ -83,7 +93,7 @@ export function useRoomMoodSocket(identity: StoredRoomIdentity | null) {
       }
       socket.close();
     };
-  }, [config, identity, setRemoteMood]);
+  }, [config, identity, setRemoteMood, setRoomPresence]);
 
   useEffect(() => {
     const socket = socketRef.current;

@@ -32,7 +32,13 @@ const errorMessageFor = (error: unknown): string => {
 };
 
 export function RoomRoute() {
-  const { config, remoteMood, setActiveRoomIdentity, setActiveThemeId } = useAppState();
+  const {
+    config,
+    remoteMood,
+    roomPresence,
+    setActiveRoomIdentity,
+    setActiveThemeId,
+  } = useAppState();
   const { roomId } = useParams();
   const [identity, setIdentity] = useState<StoredRoomIdentity | null>(() =>
     roomId ? loadRoomIdentity(roomId) : null,
@@ -105,6 +111,15 @@ export function RoomRoute() {
   const isJoined = status === "joined" && identity;
   const isReturning = Boolean(joinResult?.restoredIdentity);
   useRoomMoodSocket(isJoined ? identity : null);
+
+  const otherParticipants = identity
+    ? roomPresence.filter((participant) => participant.participantId !== identity.participantId)
+    : [];
+  const connectionMode = otherParticipants.length > 0 ? "Live together" : "Postcard mode";
+  const connectionMessage =
+    otherParticipants.length > 0
+      ? "The other person is here now. Mood changes are live."
+      : "You are connected. The other person will see updates when they return.";
 
   const remoteMoodSummary = remoteMood
     ? [
@@ -183,6 +198,12 @@ export function RoomRoute() {
 
       {isJoined && (
         <>
+          <section className="presence-panel" aria-labelledby="presence-heading">
+            <p className="route-panel__eyebrow">Presence</p>
+            <h2 id="presence-heading">{connectionMode}</h2>
+            <p>{connectionMessage}</p>
+          </section>
+
           <MoodInputPanel />
 
           <section className="remote-mood" aria-labelledby="remote-mood-heading">
