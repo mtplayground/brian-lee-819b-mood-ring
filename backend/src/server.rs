@@ -14,6 +14,7 @@ use crate::{
     config::AppConfig,
     routes::{
         health::health_check,
+        realtime::room_websocket,
         rooms::{create_room, get_theme_preference, join_room, update_theme_preference},
     },
     state::AppState,
@@ -27,6 +28,7 @@ pub fn build_router(config: AppConfig, state: AppState) -> Router {
         .route("/health", get(health_check))
         .route("/api/rooms", post(create_room))
         .route("/api/rooms/{room_id}/join", post(join_room))
+        .route("/api/rooms/{room_id}/ws", get(room_websocket))
         .route(
             "/api/rooms/{room_id}/participants/{participant_id}/theme-preference",
             get(get_theme_preference).put(update_theme_preference),
@@ -153,6 +155,24 @@ mod tests {
                     .uri(uri)
                     .header("content-type", "application/json")
                     .body(Body::from(r#"{"identityKey":"stable-key","themeId":"organic"}"#))
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_ne!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn websocket_route_is_mounted_under_api_prefix() {
+        let state = AppState::new(
+            sqlx::PgPool::connect_lazy("postgres://example").expect("lazy pool"),
+        );
+        let response = build_router(test_config(), state)
+            .oneshot(
+                Request::builder()
+                    .uri("/api/rooms/00000000-0000-4000-8000-000000000000/ws")
+                    .body(Body::empty())
                     .expect("request"),
             )
             .await
