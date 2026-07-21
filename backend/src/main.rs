@@ -5,6 +5,9 @@ mod server;
 mod services;
 mod state;
 
+#[cfg(test)]
+mod e2e;
+
 use config::AppConfig;
 use state::AppState;
 use tokio::net::TcpListener;
